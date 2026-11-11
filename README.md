@@ -45,20 +45,24 @@
    * **Login Petugas / Admin:** `http://localhost:8000/login`
    * **phpMyAdmin:** `http://localhost:8080`
 
-### 2. Lingkungan Server Ubuntu (IP Publik + Port, Sekali Jalan)
-Untuk server Ubuntu baru maupun update deploy (tanpa domain, langsung memakai `http://IP_PUBLIK:PORT`):
+### 2. Lingkungan Server Ubuntu (1 Script untuk Install, Update Git, Backup & Restore)
+Untuk instalasi pertama kali maupun saat menarik update perbaikan dari Git di server Ubuntu, cukup gunakan **1 script**:
 ```bash
 git clone https://github.com/bakpaocoklat30/antrian-adb.git
 cd antrian-adb
-chmod +x deploy-ubuntu.sh
+./deploy-ubuntu.sh
+```
+Setelah instalasi awal, setiap ada update baru di Git Anda cukup menjalankan:
+```bash
 ./deploy-ubuntu.sh
 ```
 Script [deploy-ubuntu.sh](deploy-ubuntu.sh) otomatis akan:
-* Memasang Docker Engine & Docker Compose plugin jika belum ada.
-* Meminta IP Publik dan Port yang ingin dibuka (bisa juga lewat `SERVER_IP=... APP_PORT=8000 ./deploy-ubuntu.sh`).
-* Membuat `.env` produksi lengkap dengan password database acak yang kuat dan `APP_URL` sesuai IP & port.
-* Menjalankan stack Docker dengan [docker-compose.prod.yml](docker-compose.prod.yml) (port MySQL, phpMyAdmin, dan Redis dikunci ke `127.0.0.1`, hanya port aplikasi yang dibuka).
-* Menjalankan `composer install --no-dev`, `key:generate`, `migrate --force`, seeder awal (jika tabel `users` kosong), `storage:link`, dan cache produksi.
+* Meminta akses `sudo` otomatis bila dibutuhkan, menarik update terbaru dari Git (`git pull --ff-only`), dan langsung mem-build container bila perlu.
+* Menyimpan IP Publik & Port dari `.env` (instalasi awal bisa juga langsung `SERVER_IP=202.65.116.9 APP_PORT=7030 ./deploy-ubuntu.sh`; saat update berikutnya tidak bertanya ulang).
+* Menginstal dependensi Composer produksi, membuat backup database pengaman sebelum migrasi, menjalankan `php artisan migrate --force`, dan menyegarkan cache.
+* Mengaktifkan cron backup database harian otomatis (`02:00 WIB`), serta mendukung perintah langsung:
+  * `./deploy-ubuntu.sh backup` (backup ke `backup_db/*.sql.gz`)
+  * `./deploy-ubuntu.sh restore backup_db/latest.sql.gz`
 
 ---
 
