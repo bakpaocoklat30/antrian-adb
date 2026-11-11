@@ -20,7 +20,9 @@ class Ticket extends Model
         'jalur_pendaftaran',
         'service_date_id',
         'status',
+        'call_count',
         'loket_id',
+        'catatan_loket',
         'qr_code_path'
     ];
 

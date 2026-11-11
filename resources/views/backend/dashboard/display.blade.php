@@ -105,17 +105,9 @@
             </div>
 
             <div>
-                <h3 class="text-lg font-black text-gray-800 mb-4"><i class="fa-solid fa-microphone-lines text-red-500 mr-2"></i> Pengaturan Mesin Suara (Otomatis Tersimpan)</h3>
-                
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm">
-                        <label class="block text-sm font-bold text-gray-700 mb-2">Tipe Suara</label>
-                        <select name="voice_type" onchange="syncLiveSetting('voice_type', this.value)" class="w-full border-gray-300 p-2 rounded-lg font-bold text-blue-600 focus:ring-2 focus:ring-blue-400 outline-none">
-                            <option value="tts" {{ ($setting->voice_type ?? 'tts') == 'tts' ? 'selected' : '' }}>Sistem Komputer (TTS)</option>
-                            <option value="custom" {{ ($setting->voice_type ?? '') == 'custom' ? 'selected' : '' }}>Rekaman Manusia (Custom)</option>
-                        </select>
-                    </div>
+                <h3 class="text-lg font-black text-gray-800 mb-4"><i class="fa-solid fa-microphone-lines text-red-500 mr-2"></i> Pengaturan Mesin Suara TTS (Otomatis Tersimpan)</h3>
 
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 relative shadow-sm">
                         <label class="block text-sm font-bold text-gray-700 mb-2">Kecepatan Bicara (Speed)</label>
                         <div class="flex items-center gap-3">

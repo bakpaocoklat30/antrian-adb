@@ -22,6 +22,9 @@ class User extends Authenticatable
         'password',
         'role',
         'loket_number',
+        'is_active',
+        'status_loket',
+        'keterangan_loket',
     ];
 
     /**
@@ -44,6 +47,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
     }
 

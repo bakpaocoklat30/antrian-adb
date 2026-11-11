@@ -2,67 +2,94 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ServiceDate;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 abstract class Controller
 {
     /**
-     * 🔥 MESIN GENERATOR ANTI TABRAKAN (RACE CONDITION) 🔥
-     * Dilengkapi dengan SMART SELF-HEALING untuk sinkronisasi data yang tertinggal.
+     * Generate nomor urut tiket secara atomik di dalam transaksi database.
      */
-    protected function generateSequenceNumber($prefix)
+    protected function generateSequenceNumber(string $prefix): object
     {
         return DB::transaction(function () use ($prefix) {
-            // 1. AUTO-PATCHING SCHEMA (Pastikan kolom global_sequence ada)
-            if (!Schema::hasColumn('settings', 'global_sequence')) {
-                Schema::table('settings', function ($table) {
-                    $table->bigInteger('global_sequence')->default(0)->after('id');
-                });
-            }
+            DB::table('settings')->insertOrIgnore([
+                'id' => 1,
+                'global_sequence' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
 
-            // 2. PASTIKAN ROW SETTING EXIST
-            $exists = DB::table('settings')->where('id', 1)->exists();
-            if (!$exists) {
-                DB::table('settings')->insert(['id' => 1, 'global_sequence' => 0]);
-            }
+            $currentSeq = (int) DB::table('settings')
+                ->where('id', 1)
+                ->lockForUpdate()
+                ->value('global_sequence');
 
-            // 3. 🛡️ SMART SYNC (PENYEMBUHAN DATA LAMA/TERTINGGAL) 🛡️
-            // Secara efisien menarik 100 tiket terakhir untuk mendeteksi angka paling ujung (riil)
-            $recentTickets = DB::table('tickets')->orderBy('id', 'desc')->take(100)->pluck('ticket_number');
+            $recentTickets = DB::table('tickets')
+                ->orderBy('id', 'desc')
+                ->take(100)
+                ->pluck('ticket_number');
+
             $trueMax = 0;
-            
-            foreach($recentTickets as $tn) {
+            foreach ($recentTickets as $tn) {
                 $parts = explode('-', $tn);
-                if(isset($parts[0])) {
-                    // Buang semua huruf, ambil angkanya saja secara murni
+                if (isset($parts[0])) {
                     $num = (int) preg_replace('/[^0-9]/', '', $parts[0]);
-                    if($num > $trueMax) $trueMax = $num;
+                    if ($num > $trueMax) {
+                        $trueMax = $num;
+                    }
                 }
             }
 
-            $currentSeq = DB::table('settings')->where('id', 1)->value('global_sequence');
-            
-            // Jika sequence di settings tertinggal dari angka asli di tiket, PAKSA LOMPAT!
-            if ($currentSeq < $trueMax) {
-                DB::table('settings')->where('id', 1)->update(['global_sequence' => $trueMax]);
-            }
+            $nextSequence = max($currentSeq, $trueMax) + 1;
 
-            // 4. ATOMIC INCREMENT MURNI (BYPASS ELOQUENT SILENT FAIL)
-            DB::table('settings')->where('id', 1)->increment('global_sequence', 1);
+            DB::table('settings')
+                ->where('id', 1)
+                ->update([
+                    'global_sequence' => $nextSequence,
+                    'updated_at' => now(),
+                ]);
 
-            // 5. AMBIL ANGKA TERBARU SETELAH DITAMBAH
-            $latestSequence = DB::table('settings')->where('id', 1)->value('global_sequence');
-
-            // 6. GENERATE FORMAT TIKET
-            $shortNumber = $prefix . str_pad($latestSequence, 3, '0', STR_PAD_LEFT);
+            $shortNumber = $prefix . str_pad((string) $nextSequence, 3, '0', STR_PAD_LEFT);
             $fullNumber = $shortNumber . '-' . strtoupper(Str::random(4));
 
             return (object) [
                 'short' => $shortNumber,
-                'full' => $fullNumber
+                'full' => $fullNumber,
             ];
         });
+    }
+
+    /**
+     * Ambil prefix kode sesi dari session_code atau huruf pertama nama sesi.
+     */
+    protected function sessionPrefix(ServiceDate $session): string
+    {
+        return $session->session_code
+            ? strtoupper($session->session_code)
+            : strtoupper(substr($session->session_name, 0, 1));
+    }
+
+    /**
+     * Jumlah loket verifikator aktif untuk perhitungan estimasi tunggu.
+     */
+    protected function activeCounterCount(): int
+    {
+        $count = User::where('role', 'verifikator')
+            ->where('is_active', true)
+            ->whereNotNull('loket_number')
+            ->count();
+
+        return max(1, $count);
+    }
+
+    /**
+     * Estimasi waktu tunggu (menit) berdasarkan antrian di depan dan jumlah loket aktif.
+     */
+    protected function estimateWaitMinutes(int $aheadCount): int
+    {
+        return (int) ceil(($aheadCount / $this->activeCounterCount()) * 5);
     }
 }

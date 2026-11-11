@@ -101,13 +101,10 @@
             Swal.fire({
                 title: '<span class="text-red-600 font-black">Lupa Password?</span>',
                 html: `
-                    <p class="text-sm text-gray-600 mb-4">Untuk alasan keamanan, reset sandi petugas OSIS/Loket hanya dapat dilakukan oleh Koordinator/Super Admin.</p>
-                    <a href="https://wa.me/6285890000074?text=Halo%20Admin,%20saya%20lupa%20password%20akun%20petugas%20di-SAPA%20saya.%20Mohon%20bantuannya%20untuk%20mereset." target="_blank" class="inline-block bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-5 rounded-xl shadow-md transition mb-3 w-full border-b-4 border-green-700">
+                    <p class="text-sm text-gray-600 mb-4">Untuk alasan keamanan, reset sandi petugas OSIS/Loket hanya dapat dilakukan oleh Koordinator/Super Admin melalui menu Manajemen Akun.</p>
+                    <a href="https://wa.me/6285890000074?text=Halo%20Admin,%20saya%20lupa%20password%20akun%20petugas%20di-SAPA%20saya.%20Mohon%20bantuannya%20untuk%20mereset." target="_blank" class="inline-block bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-5 rounded-xl shadow-md transition mb-2 w-full border-b-4 border-green-700">
                         <i class="fa-brands fa-whatsapp text-xl align-middle mr-2"></i> Hubungi WA Admin
                     </a>
-                    <div class="text-[10px] text-gray-400 border-t border-gray-200 pt-3 mt-2">
-                        Anda Super Admin? <a href="{{ route('super.recovery') }}" class="text-blue-500 font-bold hover:underline">Reset Paksa Di Sini</a>.
-                    </div>
                 `,
                 icon: 'warning',
                 showConfirmButton: false,

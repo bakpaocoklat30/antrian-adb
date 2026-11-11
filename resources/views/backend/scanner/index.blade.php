@@ -1,36 +1,38 @@
 @extends('layouts.app')
 @section('content')
 <div class="max-w-md mx-auto w-full relative">
-    
+
     <div class="bg-white p-6 rounded-2xl shadow-xl border border-gray-100 text-center mb-4 relative z-10">
-        <h2 class="text-2xl font-black text-gray-800">Scanner Terpadu OSIS</h2>
-        <p class="text-sm text-gray-500 mb-4">Pilih mode scanner di bawah ini:</p>
-        
-        <!-- 🔥 TOGGLE MODE SCANNER 🔥 -->
-        <div class="flex p-1 space-x-1 bg-gray-100 rounded-xl mb-4 relative z-20">
-            <button class="w-1/2 py-2 text-sm font-black rounded-lg bg-white shadow text-blue-600 transition flex items-center justify-center gap-1" id="modeAntrian" onclick="setMode('antrian')">
-                <i class="fa-solid fa-ticket"></i> Antrian
-            </button>
-            <button class="w-1/2 py-2 text-sm font-bold rounded-lg text-gray-500 hover:text-gray-700 transition flex items-center justify-center gap-1" id="modeBerkas" onclick="setMode('berkas')">
-                <i class="fa-solid fa-folder-open"></i> Terima Map
-            </button>
-        </div>
+        <h2 class="text-2xl font-black text-gray-800">Scanner Check-In Antrian</h2>
+        <p class="text-sm text-gray-500 mb-4">Scan QR Code tiket siswa atau ketik NISN / Nomor Tiket manual.</p>
 
         <div id="reader" class="w-full overflow-hidden rounded-xl border-4 border-blue-100 mb-4 bg-black aspect-square flex items-center justify-center relative transition-colors duration-300">
             <i class="fa-solid fa-qrcode text-5xl text-gray-600 absolute z-0 opacity-50"></i>
         </div>
-        
-        <button id="startBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-4 rounded-xl shadow-lg transition mb-4 flex items-center justify-center gap-2 text-lg">
+
+        <button id="startBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-4 rounded-xl shadow-lg transition mb-3 flex items-center justify-center gap-2 text-lg">
             <i class="fa-solid fa-camera"></i> Mulai Kamera
         </button>
 
-        <button id="stopBtn" class="w-full bg-red-100 hover:bg-red-200 text-red-600 font-bold py-3 px-4 rounded-xl transition mb-4 hidden flex items-center justify-center gap-2">
+        <button id="stopBtn" class="w-full bg-red-100 hover:bg-red-200 text-red-600 font-bold py-3 px-4 rounded-xl transition mb-3 hidden flex items-center justify-center gap-2">
             <i class="fa-solid fa-stop"></i> Matikan Kamera
         </button>
 
+        <div class="flex items-center gap-2 my-3">
+            <hr class="flex-1 border-gray-200">
+            <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Atau Input Manual</span>
+            <hr class="flex-1 border-gray-200">
+        </div>
+
+        <form onsubmit="submitManualCheckin(event)" class="flex gap-2 mb-4">
+            <input type="text" id="manualTicketInput" placeholder="NISN atau No. Tiket..." class="flex-1 px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm font-bold text-center focus:ring-2 focus:ring-blue-500 outline-none">
+            <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-3 rounded-xl font-bold text-sm transition">
+                <i class="fa-solid fa-check"></i> Check-In
+            </button>
+        </form>
+
         <div id="resultBox" class="hidden p-4 rounded-lg font-bold text-sm mb-4"></div>
 
-        <!-- 🔥 TOMBOL GO-SHOW 🔥 -->
         <button onclick="openGoShowModal()" class="w-full mt-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2">
             <i class="fa-solid fa-ticket"></i> Buat Tiket Go-Show (Offline)
         </button>
@@ -43,10 +45,9 @@
         </form>
     </div>
 
-    <!-- 🔥 MODAL FORM GO-SHOW (SPA & ANTI OVERFLOW) 🔥 -->
     <div id="goShowModal" class="fixed inset-0 z-50 hidden bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto flex flex-col">
-            
+
             <div class="sticky top-0 bg-white p-5 border-b border-gray-100 flex justify-between items-center z-10 rounded-t-2xl">
                 <div>
                     <h3 class="text-xl font-black text-gray-800">Form Tiket Go-Show</h3>
@@ -56,7 +57,7 @@
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-            
+
             <div class="p-5">
                 <form id="goShowForm" onsubmit="submitGoShow(event)">
                     @csrf
@@ -73,7 +74,7 @@
                             <label class="block text-xs font-bold text-gray-600 mb-1">Asal Sekolah *</label>
                             <input type="text" name="asal_sekolah" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-gray-50">
                         </div>
-                        
+
                         <div>
                             <label class="block text-xs font-bold text-gray-600 mb-2">Data Kesejahteraan (Opsional)</label>
                             <div class="flex items-center gap-4 bg-gray-50 px-4 py-3 rounded-xl border border-gray-200">
@@ -103,7 +104,7 @@
                             <textarea name="alamat" required rows="2" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-gray-50"></textarea>
                         </div>
                     </div>
-                    
+
                     <button type="submit" id="btnSubmitGoShow" class="w-full mt-6 bg-orange-600 hover:bg-orange-700 text-white font-bold py-4 rounded-xl shadow-lg transition flex justify-center items-center gap-2">
                         <i class="fa-solid fa-paper-plane"></i> Buat & Masukkan Antrian
                     </button>
@@ -118,24 +119,20 @@
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    // --- MODE SCANNER ENGINE ---
-    let currentMode = 'antrian'; // Mode default
-
-    function setMode(mode) {
-        currentMode = mode;
-        const btnAntrian = document.getElementById('modeAntrian');
-        const btnBerkas = document.getElementById('modeBerkas');
-        const scannerBox = document.getElementById('reader');
-
-        if(mode === 'antrian') {
-            btnAntrian.className = 'w-1/2 py-2 text-sm font-black rounded-lg bg-white shadow text-blue-600 transition flex items-center justify-center gap-1';
-            btnBerkas.className = 'w-1/2 py-2 text-sm font-bold rounded-lg text-gray-500 hover:text-gray-700 transition flex items-center justify-center gap-1';
-            scannerBox.className = 'w-full overflow-hidden rounded-xl border-4 border-blue-100 mb-4 bg-black aspect-square flex items-center justify-center relative transition-colors duration-300';
-        } else {
-            btnBerkas.className = 'w-1/2 py-2 text-sm font-black rounded-lg bg-white shadow text-green-600 transition flex items-center justify-center gap-1';
-            btnAntrian.className = 'w-1/2 py-2 text-sm font-bold rounded-lg text-gray-500 hover:text-gray-700 transition flex items-center justify-center gap-1';
-            scannerBox.className = 'w-full overflow-hidden rounded-xl border-4 border-green-400 mb-4 bg-black aspect-square flex items-center justify-center relative transition-colors duration-300';
-        }
+    function playBeep(isSuccess) {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = isSuccess ? 'sine' : 'sawtooth';
+            osc.frequency.value = isSuccess ? 880 : 240;
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (isSuccess ? 0.2 : 0.35));
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + (isSuccess ? 0.2 : 0.35));
+        } catch (e) {}
     }
 
     function confirmLogout() {
@@ -158,115 +155,102 @@
     let html5QrCode;
     let isProcessing = false;
 
-    function onScanSuccess(decodedText, decodedResult) {
-        if(isProcessing) return; 
+    function processCheckin(rawInput, fromCamera) {
+        if (isProcessing) return;
         isProcessing = true;
-        html5QrCode.pause(true);
+
+        if (fromCamera && html5QrCode && html5QrCode.getState() === 2) {
+            html5QrCode.pause(true);
+        }
 
         const resultBox = document.getElementById('resultBox');
         resultBox.className = 'p-4 rounded-lg font-bold text-sm mb-4 bg-yellow-100 text-yellow-700 relative z-10 shadow-md';
         resultBox.innerHTML = '<i class="fa-solid fa-spinner fa-spin border-0"></i> Sedang Memproses...';
         resultBox.classList.remove('hidden');
 
-        // 🔥 LOGIKA BERDASARKAN MODE YANG DIPILIH 🔥
-        if (currentMode === 'antrian') {
-            // PROSES 1: CHECK-IN ANTRIAN
-            let ticketNumber = decodedText;
-            if(decodedText.includes('/ticket/download/')) {
-                let parts = decodedText.split('/');
-                ticketNumber = parts[parts.length - 1];
-            }
+        fetch("{{ route('admin.scanner.checkin') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+            body: JSON.stringify({ ticket_number: rawInput })
+        })
+        .then(response => response.json())
+        .then(data => {
+            const resumeScanner = () => {
+                resultBox.classList.add('hidden');
+                if (fromCamera && html5QrCode && html5QrCode.getState() === 3) {
+                    html5QrCode.resume();
+                }
+                isProcessing = false;
+            };
 
-            fetch("{{ route('admin.scanner.checkin') }}", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
-                body: JSON.stringify({ ticket_number: ticketNumber })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if(data.success) {
-                    let audio = new Audio('https://www.soundjay.com/buttons/sounds/button-09.mp3'); audio.play();
-                    let sisaAntrian = data.antrian_di_depan !== undefined ? data.antrian_di_depan : '-';
-                    let estimasi = data.estimasi_waktu !== undefined ? data.estimasi_waktu + ' Menit' : '-';
-                    let nomorPendek = ticketNumber.split('-')[0];
+            if (data.success) {
+                playBeep(true);
+                let sisaAntrian = data.antrian_di_depan !== undefined ? data.antrian_di_depan : '-';
+                let estimasi = data.estimasi_waktu !== undefined ? data.estimasi_waktu + ' Menit' : '-';
+                let nomorPendek = data.ticket_short || rawInput.split('-')[0];
 
-                    Swal.fire({
-                        title: 'Check-In Berhasil!',
-                        html: `
-                            <div class="text-left mt-2">
-                                <div class="bg-blue-50 p-3 rounded-xl border border-blue-200 mb-4 text-sm text-blue-800 flex items-center gap-3 shadow-sm">
-                                    <i class="fa-solid fa-check-circle text-3xl"></i>
-                                    <span>Tiket Antrian <b class="text-blue-900">${nomorPendek}</b> resmi terdaftar!</span>
+                Swal.fire({
+                    title: 'Check-In Berhasil!',
+                    html: `
+                        <div class="text-left mt-2">
+                            <div class="bg-blue-50 p-3 rounded-xl border border-blue-200 mb-4 text-sm text-blue-800 flex items-center gap-3 shadow-sm">
+                                <i class="fa-solid fa-check-circle text-3xl"></i>
+                                <span>Tiket Antrian <b class="text-blue-900">${nomorPendek}</b> resmi terdaftar!</span>
+                            </div>
+                            <div class="flex justify-between bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner">
+                                <div class="text-center w-1/2 border-r border-slate-200 px-2">
+                                    <span class="block text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Antrian di Depan</span>
+                                    <span class="text-4xl font-black text-blue-600">${sisaAntrian}</span>
                                 </div>
-                                <div class="flex justify-between bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner">
-                                    <div class="text-center w-1/2 border-r border-slate-200 px-2">
-                                        <span class="block text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Antrian di Depan</span>
-                                        <span class="text-4xl font-black text-blue-600">${sisaAntrian}</span>
-                                    </div>
-                                    <div class="text-center w-1/2 px-2">
-                                        <span class="block text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Estimasi Waktu</span>
-                                        <span class="text-4xl font-black text-yellow-500">${estimasi}</span>
-                                    </div>
+                                <div class="text-center w-1/2 px-2">
+                                    <span class="block text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Estimasi Waktu</span>
+                                    <span class="text-4xl font-black text-yellow-500">${estimasi}</span>
                                 </div>
                             </div>
-                        `,
-                        icon: 'success', confirmButtonColor: '#3b82f6', confirmButtonText: '<i class="fa-solid fa-camera"></i> Lanjut Scan', allowOutsideClick: false
-                    }).then(() => { resultBox.classList.add('hidden'); html5QrCode.resume(); isProcessing = false; });
-                } else {
-                    let audio = new Audio('https://www.soundjay.com/buttons/sounds/button-10.mp3'); audio.play();
-                    resultBox.classList.add('hidden'); 
-                    Swal.fire({
-                        title: 'Akses Ditolak!', text: data.message, icon: 'error', confirmButtonColor: '#e3342f'
-                    }).then(() => { html5QrCode.resume(); isProcessing = false; });
-                }
-            }).catch(error => { handleNetworkError(); });
-
-        } else if (currentMode === 'berkas') {
-            // PROSES 2: SCAN TERIMA BERKAS MAP (QR Code NISN)
-            let nisnData = decodedText;
-
-            fetch("{{ route('admin.pengumuman.scan_berkas') }}", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
-                body: JSON.stringify({ nisn: nisnData })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    let audio = new Audio('https://www.soundjay.com/buttons/sounds/button-09.mp3'); audio.play();
-                    
-                    if (data.already_scanned) {
-                        Swal.fire({ title: 'SUDAH DITERIMA!', text: data.message, icon: 'info', confirmButtonColor: '#3b82f6', confirmButtonText: 'Oke, Lanjut' })
-                        .then(() => { resultBox.classList.add('hidden'); html5QrCode.resume(); isProcessing = false; });
-                    } else {
-                        Swal.fire({
-                            title: 'MAP DITERIMA!', 
-                            html: `<div class="bg-green-100 border border-green-300 p-4 rounded-xl text-green-800 text-sm mt-2"><b>${data.message}</b><br><br>Silakan masukkan Map ke keranjang panitia sesuai warna jurusannya.</div>`,
-                            icon: 'success', confirmButtonColor: '#10b981', confirmButtonText: '<i class="fa-solid fa-camera"></i> Lanjut Scan'
-                        }).then(() => { resultBox.classList.add('hidden'); html5QrCode.resume(); isProcessing = false; });
-                    }
-                } else {
-                    let audio = new Audio('https://www.soundjay.com/buttons/sounds/button-10.mp3'); audio.play();
-                    resultBox.classList.add('hidden');
-                    Swal.fire({ title: 'DITOLAK!', text: data.message, icon: 'error', confirmButtonColor: '#ef4444' })
-                    .then(() => { html5QrCode.resume(); isProcessing = false; });
-                }
-            }).catch(error => { handleNetworkError(); });
-        }
+                        </div>
+                    `,
+                    icon: 'success', confirmButtonColor: '#3b82f6', confirmButtonText: '<i class="fa-solid fa-check"></i> Lanjut', allowOutsideClick: false
+                }).then(resumeScanner);
+            } else {
+                playBeep(false);
+                resultBox.classList.add('hidden');
+                Swal.fire({
+                    title: 'Akses Ditolak!', text: data.message, icon: 'error', confirmButtonColor: '#e3342f'
+                }).then(resumeScanner);
+            }
+        }).catch(() => handleNetworkError(fromCamera));
     }
 
-    function handleNetworkError() {
+    function onScanSuccess(decodedText) {
+        processCheckin(decodedText, true);
+    }
+
+    function submitManualCheckin(e) {
+        e.preventDefault();
+        const inputEl = document.getElementById('manualTicketInput');
+        const val = inputEl.value.trim();
+        if (!val) {
+            Swal.fire('Peringatan', 'Masukkan NISN atau Nomor Tiket terlebih dahulu.', 'warning');
+            return;
+        }
+        processCheckin(val, false);
+        inputEl.value = '';
+    }
+
+    function handleNetworkError(fromCamera) {
         document.getElementById('resultBox').classList.add('hidden');
         Swal.fire('Koneksi Terputus!', 'Gagal menghubungi server.', 'warning').then(() => {
-            html5QrCode.resume();
+            if (fromCamera && html5QrCode && html5QrCode.getState() === 3) {
+                html5QrCode.resume();
+            }
             isProcessing = false;
         });
     }
 
-    document.getElementById('startBtn').addEventListener('click', function() {
+    document.getElementById('startBtn').addEventListener('click', function () {
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
-        
+
         startBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyiapkan...';
         startBtn.disabled = true;
 
@@ -274,26 +258,26 @@
         const config = { fps: 10, qrbox: { width: 250, height: 250 } };
 
         html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
-        .then(() => {
-            startBtn.classList.add('hidden');
-            stopBtn.classList.remove('hidden');
-        })
-        .catch(err => {
-            html5QrCode.start({ facingMode: "user" }, config, onScanSuccess)
             .then(() => {
                 startBtn.classList.add('hidden');
                 stopBtn.classList.remove('hidden');
             })
-            .catch(err2 => {
-                Swal.fire('Kamera Tidak Ditemukan', 'Pastikan izin kamera di browser telah di-Allow.', 'error');
-                startBtn.innerHTML = '<i class="fa-solid fa-camera"></i> Coba Lagi';
-                startBtn.disabled = false;
+            .catch(() => {
+                html5QrCode.start({ facingMode: "user" }, config, onScanSuccess)
+                    .then(() => {
+                        startBtn.classList.add('hidden');
+                        stopBtn.classList.remove('hidden');
+                    })
+                    .catch(() => {
+                        Swal.fire('Kamera Tidak Ditemukan', 'Pastikan izin kamera di browser telah di-Allow.', 'error');
+                        startBtn.innerHTML = '<i class="fa-solid fa-camera"></i> Coba Lagi';
+                        startBtn.disabled = false;
+                    });
             });
-        });
     });
 
-    document.getElementById('stopBtn').addEventListener('click', function() {
-        if(html5QrCode) {
+    document.getElementById('stopBtn').addEventListener('click', function () {
+        if (html5QrCode) {
             html5QrCode.stop().then(() => {
                 document.getElementById('startBtn').classList.remove('hidden');
                 document.getElementById('stopBtn').classList.add('hidden');
@@ -305,35 +289,34 @@
 
     @if(session('error')) Swal.fire('Error', '{{ session('error') }}', 'error'); @endif
 
-    // --- ENGINE SPA GO-SHOW ---
     function openGoShowModal() {
-        if(html5QrCode && html5QrCode.getState() === 2) { html5QrCode.pause(true); }
+        if (html5QrCode && html5QrCode.getState() === 2) { html5QrCode.pause(true); }
         document.getElementById('goShowModal').classList.remove('hidden');
     }
 
     function closeGoShowModal() {
         document.getElementById('goShowModal').classList.add('hidden');
         document.getElementById('goShowForm').reset();
-        if(html5QrCode && html5QrCode.getState() === 3) { html5QrCode.resume(); }
+        if (html5QrCode && html5QrCode.getState() === 3) { html5QrCode.resume(); }
     }
 
     function submitGoShow(e) {
         e.preventDefault();
-        
+
         let form = document.getElementById('goShowForm');
         let formData = new FormData(form);
         let btnSubmit = document.getElementById('btnSubmitGoShow');
 
         let isKip = document.getElementById('cb_kip').checked;
         let isDtks = document.getElementById('cb_dtks').checked;
-        let jalur = 'REGULER'; 
+        let jalur = 'REGULER';
 
-        if (isKip && isDtks) { jalur = 'KIP & DTKS'; } 
-        else if (isKip) { jalur = 'KIP'; } 
+        if (isKip && isDtks) { jalur = 'KIP & DTKS'; }
+        else if (isKip) { jalur = 'KIP'; }
         else if (isDtks) { jalur = 'DTKS'; }
-        
+
         formData.append('jalur_pendaftaran', jalur);
-        
+
         let originalText = btnSubmit.innerHTML;
         btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memproses...';
         btnSubmit.disabled = true;
@@ -343,21 +326,21 @@
             headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
             body: formData
         })
-        .then(res => res.json().then(data => ({status: res.status, body: data})))
+        .then(res => res.json().then(data => ({ status: res.status, body: data })))
         .then(obj => {
             btnSubmit.innerHTML = originalText;
             btnSubmit.disabled = false;
 
-            if(obj.status === 422) {
+            if (obj.status === 422) {
                 let errors = obj.body.errors;
                 let errorMsg = Object.values(errors).map(e => e.join('\n')).join('\n');
                 Swal.fire('Validasi Gagal!', errorMsg, 'error');
                 return;
             }
 
-            if(obj.body.success) {
-                let audio = new Audio('https://www.soundjay.com/buttons/sounds/button-09.mp3'); audio.play();
-                closeGoShowModal(); 
+            if (obj.body.success) {
+                playBeep(true);
+                closeGoShowModal();
                 Swal.fire({
                     title: 'TIKET OFFLINE BERHASIL!',
                     html: `
@@ -374,7 +357,7 @@
                 Swal.fire('Gagal!', obj.body.message, 'error');
             }
         })
-        .catch(error => {
+        .catch(() => {
             btnSubmit.innerHTML = originalText;
             btnSubmit.disabled = false;
             Swal.fire('Error Server!', 'Gagal menghubungi server.', 'error');
