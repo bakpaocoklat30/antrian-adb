@@ -33,6 +33,10 @@ if [ "$(id -u)" -ne 0 ]; then
     fi
 fi
 
+if [ ! -w "$SCRIPT_DIR" ]; then
+    error "Folder '$SCRIPT_DIR' bukan milik user '$(whoami)' sehingga tidak bisa menulis '.env'. Jalankan dengan: sudo ./deploy-ubuntu.sh (atau ubah kepemilikan folder: sudo chown -R \$(whoami):\$(whoami) '$SCRIPT_DIR')"
+fi
+
 set_env() {
     local key="$1"
     local val="$2"
@@ -174,36 +178,37 @@ $COMPOSE_CMD up -d --build
 
 # ── 5. Setup Aplikasi Laravel di dalam Container ───────────────────────────────
 info "Mengatur izin folder storage & bootstrap/cache..."
-$DOCKER exec -u root disapa_app chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
-$DOCKER exec -u root disapa_app chmod -R ug+rwx /var/www/storage /var/www/bootstrap/cache
+$DOCKER exec -u root disapa_app sh -c "mkdir -p /var/www/storage/app/tts-cache /var/www/storage/framework/views /var/www/storage/framework/cache /var/www/storage/framework/sessions /var/www/storage/logs && chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache && chmod -R ug+rwx /var/www/storage /var/www/bootstrap/cache"
 
 info "Menginstal dependensi PHP produksi (Composer)..."
-$DOCKER exec disapa_app composer install --no-dev --optimize-autoloader --no-interaction
+$DOCKER exec -u root -e COMPOSER_HOME=/tmp/composer disapa_app composer install --no-dev --optimize-autoloader --no-interaction
+$DOCKER exec -u root disapa_app chmod -R a+rX /var/www/vendor
 
 CURRENT_APP_KEY="$(get_env APP_KEY)"
 if [ -z "$CURRENT_APP_KEY" ]; then
     info "Membuat APP_KEY baru..."
-    $DOCKER exec disapa_app php artisan key:generate --force --no-interaction
+    $DOCKER exec -u root disapa_app php artisan key:generate --force --no-interaction
 fi
+$DOCKER exec -u root disapa_app sh -c "chgrp 33 /var/www/.env && chmod 640 /var/www/.env"
 
 info "Membersihkan cache lama sebelum migrasi..."
-$DOCKER exec disapa_app php artisan optimize:clear
+$DOCKER exec -u root disapa_app php artisan optimize:clear
 
 chmod +x "$SCRIPT_DIR/backup-db.sh" "$SCRIPT_DIR/restore-db.sh"
 
-USER_COUNT="$($DOCKER exec disapa_app php -r "require 'vendor/autoload.php'; \$app = require 'bootstrap/app.php'; \$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); try { echo App\Models\User::count(); } catch (Throwable \$e) { echo 0; }" 2>/dev/null || echo 0)"
+USER_COUNT="$($DOCKER exec -u root disapa_app php -r "require 'vendor/autoload.php'; \$app = require 'bootstrap/app.php'; \$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); try { echo App\Models\User::count(); } catch (Throwable \$e) { echo 0; }" 2>/dev/null || echo 0)"
 if [ "${USER_COUNT:-0}" -gt 0 ]; then
     info "Data database terdeteksi (${USER_COUNT} user). Membuat backup pengaman sebelum migrasi..."
     "$SCRIPT_DIR/backup-db.sh" || warn "Backup pra-migrasi dilewati."
 fi
 
 info "Menjalankan migrasi database..."
-$DOCKER exec disapa_app php artisan migrate --force --no-interaction
+$DOCKER exec -u root disapa_app php artisan migrate --force --no-interaction
 
-USER_COUNT="$($DOCKER exec disapa_app php -r "require 'vendor/autoload.php'; \$app = require 'bootstrap/app.php'; \$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); echo App\Models\User::count();")"
+USER_COUNT="$($DOCKER exec -u root disapa_app php -r "require 'vendor/autoload.php'; \$app = require 'bootstrap/app.php'; \$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); echo App\Models\User::count();")"
 if [ "${USER_COUNT:-0}" = "0" ]; then
     info "Tabel users kosong, menjalankan seeder akun awal..."
-    $DOCKER exec disapa_app php artisan db:seed --force --no-interaction
+    $DOCKER exec -u root disapa_app php artisan db:seed --force --no-interaction
     "$SCRIPT_DIR/backup-db.sh" || warn "Backup awal gagal dibuat."
 else
     ok "Tabel users sudah berisi ${USER_COUNT} akun, melewati seeder awal."
@@ -211,17 +216,19 @@ fi
 
 if [ -d /etc/cron.d ]; then
     info "Menjadwalkan backup database otomatis setiap hari pukul 02:00 WIB..."
+    mkdir -p "$SCRIPT_DIR/backup_db"
     printf "0 2 * * * root %s/backup-db.sh >> %s/backup_db/cron.log 2>&1\n" "$SCRIPT_DIR" "$SCRIPT_DIR" | $SUDO tee /etc/cron.d/disapa-db-backup >/dev/null
     $SUDO chmod 644 /etc/cron.d/disapa-db-backup
     ok "Cron backup harian aktif di /etc/cron.d/disapa-db-backup."
 fi
 
-$DOCKER exec disapa_app php artisan storage:link --no-interaction >/dev/null 2>&1 || true
+$DOCKER exec -u root disapa_app php artisan storage:link --no-interaction >/dev/null 2>&1 || true
 
 info "Mengoptimalkan cache Laravel untuk produksi..."
-$DOCKER exec disapa_app php artisan config:cache
-$DOCKER exec disapa_app php artisan route:cache
-$DOCKER exec disapa_app php artisan view:cache
+$DOCKER exec -u root disapa_app php artisan config:cache
+$DOCKER exec -u root disapa_app php artisan route:cache
+$DOCKER exec -u root disapa_app php artisan view:cache
+$DOCKER exec -u root disapa_app sh -c "chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache && chmod -R ug+rwx /var/www/storage /var/www/bootstrap/cache"
 
 # ── 6. Buka port aplikasi di UFW jika firewall aktif ──────────────────────────
 if command -v ufw >/dev/null 2>&1 && $SUDO ufw status 2>/dev/null | grep -q "Status: active"; then
