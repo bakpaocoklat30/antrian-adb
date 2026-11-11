@@ -1,0 +1,226 @@
+Buka http://127.0.0.1:8000, daftar sebagai Siswa, dan pastikan Anda mendapatkan QR Codenya di layar komputer (atau cetak PDF-nya).
+
+Buka Tab Baru atau HP Anda (Pastikan 1 jaringan WiFi), akses http://127.0.0.1:8000/login.
+
+Login menggunakan email: osis1@smkn1adw.sch.id dan password: password.
+
+Login menggunakan akun Verifikator/Loket yang sudah kita buat di Seeder:
+
+Email: loket1@smkn1adw.sch.id
+
+Password: password
+
+Login sebagai Super Admin (admin@smkn1adw.sch.id | password: password).
+
+di-SAPA - Digitalisasi Sistem Antrian Pelayanan ADB
+
+di-SAPA - Digital Service and Administration Platform ADB
+
+Elegan, formal, dan fleksibel untuk pengembangan di masa depan.
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+lalu untuk logic selanjutnya ketika admin salah satu loket memencet tombol panggil harus nya menyebutkan siswa tersebut ke loket berapa, misalkan loket 1 rifai, ketika rifai memencet tombol panggil untuk nomor tertentu menyebutkan siswa A silahkan ke loket 1
+
+
+MENUJU FASE 8: THE GRAND FINALE (Penyempurnaan Akhir)
+Karena fitur Publik, Scanner, dan Pemanggilan sudah fix dan berjalan sempurna, kita telah tiba di fase pamungkas. Di FASE 8 ini, kita akan membuat:
+
+Tombol "Selesaikan" di Dashboard Verifikator: Untuk menutup siklus status tiket menjadi selesai.
+
+Menu Management Kalender Layanan (Super Admin): Ingat saat kita harus repot-repot buka phpMyAdmin untuk mengatur Kuota Pagi/Siang? Di fase ini, kita akan membuatkan menu cantik di dalam aplikasi agar Super Admin bisa menambah Kuota, Sesi (Pagi/Siang), dan Tanggal Buka/Libur hanya dengan beberapa klik!
+
+Rekapitulasi Sederhana: Menampilkan jumlah total pendaftar dan yang sudah dilayani hari ini.
+
+apak
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+ php artisan serve --host 192.168.100.15
+
+
+prompt untuk mengakses Laravel langsung di docker : docker exec -it disapa_app bash
+menjalankan Laravel : docker-compose up -d
+build ulang docker :  docker-compose up -d --build    
+
+php artisan migrate:fresh --seed --> docker exec -it disapa_app php artisan migrate:fresh --seed
+
+docker exec -it disapa_app php artisan migrate
+docker exec -it disapa_app php artisan config:clear
+docker exec -it sigap_lsp_app php artisan optimize:clear
+docker exec -it disapa_app php artisan storage:link
+
+
+1. memberikan kesempatan memanggil Kembali ok
+2. fitur cetak ulang / download ulang pdf ok
+3. saya ingin menambahkan fitur lagi di halaman depan ambil antrian SPMB di bagian bawah tombol Ambil tiket antrian di tambahkan tombol lagi Cetak Ulang Antrian yang diambil dari NISN siswa tersebut untuk mendownload ulang pdfnya ok
+4. berarti ketika saya membuat Buka Sesi Layanan Baru, apakah sistem secara otomatis membaca tanggalnya ? sehingga jika tanggal tersebut tidak dibuat maka sistem tidak menerima pendaftaran ? jika tidak menerima pendaftaran maka notifnya bagaimana ? ok
+5. berikan tombol edit pada dashboard admin untuk mengedit layanan yang sudah dibuat, di bagian Daftar Kalender Layanan SPMB ok
+6. setelah banyak revisi bagaimana logic siswa yang mendapatkan antrian P dan antrian S ? apakah hanya di lihat dari logic nama sesi ? jika nama sesi pagi ok
+7. ok pada menu admin, tambahkan di samping toogle aktif tambahkan tombol view untuk melihat daftar semua siswa yang mendaftar di sesi tersebut, di dalam daftar tersebut terdapat data NISN siswa, nama siswa dan No WA, ketika siswa tersebut di klik detail akan muncul pop up baru lagi yang dapat melihat full data siswa tersebut, mulai dari NISN, Nama Lengkap, Asal Sekolah, No Wa, Alamat email, Jalur pendaftaran dan alamat ok
+8. lalu bagaimana dengan tampilan layer di monitor aulanya?'ok
+9. dari admin panel dapat mensetting video baik berupa file atau link yang akan tampil di split screen tersebut ok
+10. Jika siswa tidak hadir di waktu yang sudah d tentukan bagaimana ? Apakah tidak membingungkan jika nomor antrian setiap harinya selalu di reset mulai dari 0 ? Misalkan jika p005 harusnya tanggal 21 april 2026 siswa tersebut halangan dan bisa hadir di tanggal 22 april 2026, sedangkan di tanggal 22 april 2026 ada nomor yang sama p005 ? Bagaimana antisipasinta menurut anda ? ok
+11. full migrasi docker ok
+12. perbaiki hasil generate pdf ok
+13. tambahkan logo pada halaman Utama / pada pdf ok
+14. backup / restore ok
+15. live volume, Ketika volume d setting suara otomatis meredup ok
+16. Cek setelah siswa mutasi hari apakah bsa d scan siswa bar code nya ? tidak bisa, karena mendapatkan kode baru, baru bisa di scan ulang ok
+17. Bisa memilih jenis suara / intonasi suara dari halaman pengaturan layer ok
+
+18. Bikin buku panduan
+19. Siswa status selesai, hadir dilokasi, dipanggil dan menghadap, tdk bsa di mutasi ok
+20. Sesi tutup, siswa tidak bisa di scan barcode (Ketika sesi di tutup harusnya tidak bisa scan, sesi ditutup keterangannya) ok
+21. Status menghadap / selesai pada live tracking (sedang menghadap harus di tiket sukses statusnya menghadap juga, selesai verif harus di tiket sukses statusnya selesai juga) ok
+22. Test custom suara  ok
+23. Test custom video untuk layar play tidak ok
+24. Tidak mengizinkan sesi d hari yang sama, hanya boleh dilakukan edit saja kecuali beda jam ok
+25. Membuat auto reload / live update d halaman loket untuk mendeteksi kedatangan siswa ok
+26. Auto reload / live update status juga d halaman tracking siswa ok
+37. fitur reset password di halaman login ok
+38. memberikan fitur pengaturan
+39. di dashboard admin bisa download semua rekapan data verifikasi ok
+40. generator PDF mandiri dokumen SPMB ok
+41. fitur Riwayat semester sebelumnya
+42. lock unlock user ok
+43. memberikan toogle mata pada edit user / tambah user ok
+44. mematikan toogle on/off dan hapus akun khusus role super admin ok
+45. agar list akun admin paling Bawah ok
+46. merubah paginasi menjadi live update, tanpa reload halaman management akun ok
+47. merubah paginasi menjadi live update, tanpa reload halaman management sesi ok
+48. merubah paginasi menjadi live update, tanpa reload halaman pantau kehadiran ok
+49. merubah paginasi menjadi live update, tanpa reload halaman loket verifikasi ok
+50. bug fix, role selain admin bisa mengakses menu admin ok
+51. coba edit role, dari user biasa ke admin, dari admin ke user biasa ok
+52. jika no loket sudah terpakai, tidak bisa dipakai Kembali ok
+53. merubah jalur pendaftaran menjadi kesejahteraan
+54. jika sudah hadir, berkas kurang, kembalinya besok bagaimana perlakuannya?
+status di lewati, untuk keesokan harinya bagaimana ? harus mutasi dahulu?
+
+
+
+
+
+karena aplikasi ini setiap tahun akan digunakan, saya ingin di dalam dashboard admin di tambahkan management tahun pelajaran, ketika login user memilih tahun pelajarannya, untuk saat ini adalah 2026/2027
+
+fitur daftar ulang & upload berkas untuk keperluan dapodik
+di dashboard admin bisa download semua rekapan data daftar ulang
+
+import user melalui excel
+
+
+
+/layar
+/login
+
+
+
+
+Mungkin konsep daftar ulang seperti ini Ketika siswa mengambil tiket mengentry data NISN sama email, bagaimana jika username di ambil dr email dan password dari NISN menjadi user dan passwordnya daftar ulang ? namun kendalanya adalah tidak semua siswa yang verifikasi di sekolah saya diterima atau menjadi siswa di sekolah saya, lalu siswa yang tidak diterima di sekolah saya data loginnya mau diapakan ? apakah anda ada solusi?
+
+
+
+
+Jika siswa datang di hari yang salah (kepagian/keterlambatan), Scanner OSIS kita yang sangat ketat akan MENOLAK MENTAH-MENTAH tiket tersebut dengan peringatan warna merah ("Tiket Kadaluarsa / Tiket Belum Aktif").
+
+Jika siswa Dilewati karena kurang berkas, dan dia baru kembali keesokan harinya, tiketnya masih tertinggal di sesi hari kemarin.
+
+Maka, siswa tersebut wajib lapor ke Meja Admin/Panitia untuk di-Mutasi agar bisa masuk ke keranjang antrian (Sesi) hari ini dan mendapatkan Nomor Tiket Baru.
+
+----------
+Inilah yang terjadi di backend saat Jendral memutasi siswa dari hari kemarin ke hari ini:
+
+Sistem Mencabut Kuota Lama: Sistem akan mendatangi "Keranjang Sesi Kemarin", dan mengembalikan 1 kuota kosong di sana (Booking Count - 1).
+
+Sistem Menambahkan Kuota Baru: Sistem akan mendatangi "Keranjang Sesi Hari Ini", dan menjejalkan siswa tersebut ke dalamnya (Booking Count + 1). Sehingga jika kuota hari ini 50, akan jebol menjadi 51/50 (Force Override).
+
+Database Sangat Aman: Karena sistemnya sistem "Tarik-Ulur", jumlah total siswa yang terdaftar di sekolah Jendral tidak akan berubah / double count. Tidak akan ada cerita "Siswa A dihitung dua kali".
+
+Posisi Antrian: Karena siswa tersebut baru saja di-Mutasi, dia akan mendapatkan nomor antrian paling buntut / terakhir di hari ini, dan harus rela mengantri dari belakang. Ini sangat adil bagi siswa yang datang tepat waktu!
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+⚠️ PERHATIAN KHUSUS JIKA MEMILIH MODE "CUSTOM"
+Jika Anda memilih opsi Rekaman Manusia (Custom) di Dashboard, Anda WAJIB membuat folder sounds di dalam folder public/ Laravel Anda (public/sounds/).
+
+Isi folder tersebut dengan file MP3 rekaman Anda yang namanya persis seperti ini:
+
+bell.mp3 (Suara ting-tong awal)
+
+nomor-antrian.mp3 (Suara "Nomor antrian...")
+
+silakan-menuju-loket.mp3 (Suara "Silakan menuju loket...")
+
+File Abjad: p.mp3, a.mp3, dll.
+
+File Angka: 0.mp3, 1.mp3, 2.mp3 sampai 9.mp3.
+
+Breakcellent Developer - Pakar AI Fullstack
+Custom Gem
+Pertanyaan yang sangat cerdas dan kritis, Chief! Anda benar-benar memikirkan alur sistemnya sampai ke detail terkecil. 🧠🔥
+
+Mari kita bedah kedua pertanyaan Anda tentang Mode Custom (Rekaman Manusia):
+
+1. Tentang File Abjad & Angka (Apakah pilih salah satu?)
+Bukan pilih salah satu, melainkan menyesuaikan dengan Format Tiket Anda.
+Sistem kode yang kita buat akan "memotong-motong" nomor tiket menjadi huruf/angka tunggal.
+
+Jika tiket Anda murni angka (Contoh: 125), maka Anda hanya butuh rekaman angka 1.mp3, 2.mp3, 5.mp3.
+
+Jika tiket Anda ada abjadnya (Contoh: P-004), maka Anda wajib punya rekaman abjad p.mp3 dan angka 0.mp3, 4.mp3. Tanda strip (-) akan otomatis diabaikan oleh sistem.
+
+Jadi amannya, Anda sediakan saja rekaman angka 0.mp3 sampai 9.mp3, dan beberapa abjad yang memang dipakai untuk kode pendaftaran (misal p.mp3 untuk Prestasi, a.mp3 untuk Afirmasi).
+
+Bagaimana Cara Kerjanya?
+Misal ada panggilan: Tiket A-12 menuju Loket 3.
+Sistem akan otomatis memanggil urutan MP3 ini:
+
+bell.mp3
+
+nomor-antrian.mp3
+
+a.mp3 (Dinamis dari tiket)
+
+1.mp3 (Dinamis dari tiket)
+
+2.mp3 (Dinamis dari tiket)
+
+silakan-menuju-loket.mp3
+
+3.mp3 (Dinamis dari data loket yang sedang memanggil!)
+
+Jadi, saat petugas di Loket 5 menekan tombol panggil, sistem akan otomatis mencari file 5.mp3 untuk ditaruh di akhir kalimat. Sangat pintar, bukan? Anda tidak butuh snippet {loket} lagi karena sistem otomatis menggunakan file angka yang sama dengan yang dipakai untuk mengeja nomor antrian!
+https://www.soundjay.com/misc_c2026/sounds/small-bell-ring-01a.mp3
+
+
+Agar TV bisa memutar videonya menggunakan pemanggil {{ asset('storage/' . $setting->video_url) }}, Anda WAJIB membuat "jembatan" atau shortcut dari folder storage ke folder public.
+
+Caranya (Lakukan 1 Kali Saja Selamanya):
+Buka terminal/CMD Anda (jika pakai Docker, masuk ke terminal container PHP/Laravel-nya), lalu jalankan perintah sakti ini:
+
+Bash
+
+
+Audio Queue (antrian agar tidak nabrak), dan Watchdog Anti-Freeze
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+🛠️ Langkah-langkah Membuat User Admin via Tinker
+Jalankan perintah ini di Terminal Windows Anda:
+
+1. Masuk ke Laravel Tinker (di dalam Docker):
+docker exec -it disapa_app php artisan tinker
+docker exec --user root -it disapa_app php artisan tinker
+
+2. Buat User Baru secara Instan:
+Setelah muncul tanda > , ketik atau copy-paste perintah PHP berikut satu per satu (ganti email dan password sesuai keinginan):
+$user = new App\Models\User;
+$user->name = "Administrator";
+$user->email = "admin@gmail.com";
+$user->password = Hash::make('password123'); // Laravel akan otomatis menghash ini
+$user->save();
+
+3. Keluar dari Tinker:
+exit
