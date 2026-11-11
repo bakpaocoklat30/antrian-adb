@@ -133,9 +133,9 @@
             </td>
             
             <td style="width: 72%; padding-left: 10px; text-align: center;">
-                <h1 class="instansi-name">SMK NEGERI 1 ADIWERNA</h1>
-                <p class="instansi-desc">Digitalisasi Sistem Antrian Pelayanan ADB (di-SAPA) - SPMB Tahun {{ date('Y') }}</p>
-                <p class="instansi-address">JL. Raya II Po Box 24 Telp. (0283) 443768 Adiwerna 52194 Kab. Tegal</p>
+                <h1 class="instansi-name">{{ $ticket->event?->subtitle ?: 'SMK NEGERI 1 ADIWERNA' }}</h1>
+                <p class="instansi-desc">{{ $ticket->event?->name ?: 'Digitalisasi Sistem Antrian Pelayanan ADB (di-SAPA)' }}</p>
+                <p class="instansi-address">Sistem Antrian Pelayanan Terpadu (di-SAPA)</p>
             </td>
             
             <td style="width: 14%; text-align: center;">
@@ -170,73 +170,51 @@
         </tr>
     </table>
 
+    @php $requiresCheckin = (bool) ($ticket->event?->requires_checkin ?? false); @endphp
     <table class="alert-box">
         <tr>
             <td>
-                <span class="alert-text">[ PENTING ] Wajib Berpakaian OSIS Dan Hadir 15 Menit Sebelum Jam Kedatangan Dimulai!</span>
+                <span class="alert-text">
+                    @if($requiresCheckin)
+                        [ PENTING ] Harap Hadir 15 Menit Sebelum Jam Kedatangan Dimulai &amp; Siapkan QR e-Tiket Ini untuk Check-In!
+                    @else
+                        [ PENTING ] Harap Hadir 15 Menit Sebelum Jam Kedatangan Dimulai &amp; Pantau Panggilan Nomor Antrian Anda!
+                    @endif
+                </span>
             </td>
         </tr>
     </table>
 
-    <div class="section-title">A. Data Calon Peserta Didik</div>
+    <div class="section-title">A. Data Pendaftar ({{ $ticket->event?->name ?? 'Antrian' }})</div>
     <table class="data-table">
         <tr>
-            <td class="data-label">Nama Lengkap (CPD)</td>
+            <td class="data-label">{{ $ticket->event?->name_label ?? 'Nama Lengkap' }}</td>
             <td class="data-colon">:</td>
             <td class="data-value" style="font-size: 13px; text-transform: uppercase;">{{ $ticket->nama_cpd }}</td>
         </tr>
         <tr>
-            <td class="data-label">Nomor Induk Siswa Nasional (NISN)</td>
+            <td class="data-label">{{ $ticket->event?->identifier_label ?? 'Identitas' }}</td>
             <td class="data-colon">:</td>
             <td class="data-value">{{ $ticket->nisn }}</td>
         </tr>
+        @foreach($ticket->displayDetails() as $detail)
         <tr>
-            <td class="data-label">Asal Sekolah</td>
+            <td class="data-label">{{ $detail['label'] }}</td>
             <td class="data-colon">:</td>
-            <td class="data-value">{{ $ticket->asal_sekolah }}</td>
+            <td class="data-value">{{ $detail['value'] }}</td>
         </tr>
-        
-        <tr>
-            <td class="data-label">Data Kesejahteraan</td>
-            <td class="data-colon">:</td>
-            <td class="data-value" style="color: #1e40af;">
-                @php
-                    $hasKip = str_contains($ticket->jalur_pendaftaran, 'KIP');
-                    $hasDtks = str_contains($ticket->jalur_pendaftaran, 'DTKS');
-                @endphp
-                <span style="display: inline-block; margin-right: 15px;">
-                    {!! $hasKip ? '<b>[ V ]</b>' : '[ &nbsp;&nbsp; ]' !!} Punya KIP
-                </span>
-                <span style="display: inline-block;">
-                    {!! $hasDtks ? '<b>[ V ]</b>' : '[ &nbsp;&nbsp; ]' !!} Punya DTKS
-                </span>
-            </td>
-        </tr>
-
-        <tr>
-            <td class="data-label">No. WhatsApp / Email</td>
-            <td class="data-colon">:</td>
-            <td class="data-value">{{ $ticket->whatsapp }} / {{ $ticket->email }}</td>
-        </tr>
-        <tr>
-            <td class="data-label">Alamat Rumah</td>
-            <td class="data-colon">:</td>
-            <td class="data-value">{{ $ticket->alamat }}</td>
-        </tr>
+        @endforeach
     </table>
 
-    <div class="section-title" style="margin-top: 15px;">B. Berkas Persyaratan Yang Wajib Dibawa</div>
+    @php $checklistItems = $ticket->event?->checklist_items ?? []; @endphp
+    @if(!empty($checklistItems))
+    <div class="section-title" style="margin-top: 15px;">B. Kelengkapan / Ketentuan Event</div>
     <table class="checklist-table">
-        <tr><td class="box-container"><div class="box"></div></td><td class="box-text">Buku Rapor SMP/Sederajat</td></tr>
-        <tr><td class="box-container"><div class="box"></div></td><td class="box-text">Surat Keterangan Nilai Rapor Semester I-V Asli</td></tr>
-        <tr><td class="box-container"><div class="box"></div></td><td class="box-text">SKL/Ijazah bagi lulusan tahun sebelumnya</td></tr>
-        <tr><td class="box-container"><div class="box"></div></td><td class="box-text">Akta Kelahiran</td></tr>
-        <tr><td class="box-container"><div class="box"></div></td><td class="box-text">Kartu Keluarga</td></tr>
-        <tr><td class="box-container"><div class="box"></div></td><td class="box-text">Surat Keterangan Sehat dari Dokter Pemerintah atau Surat Pernyataan Sehat</td></tr>
-        <tr><td class="box-container"><div class="box"></div></td><td class="box-text">Pakta Integritas kebenaran dokumen</td></tr>
-        <tr><td class="box-container"><div class="box"></div></td><td class="box-text">Piagam dan keterangan kebenaran piagam (jika memiliki prestasi)</td></tr>
-        <tr><td class="box-container"><div class="box"></div></td><td class="box-text">Print out Ajuan Akun dari sistem pusat (spmb.jatengprov.go.id)</td></tr>
+        @foreach($checklistItems as $item)
+        <tr><td class="box-container"><div class="box"></div></td><td class="box-text">{{ $item }}</td></tr>
+        @endforeach
     </table>
+    @endif
 
     <div class="signature-section">
         <table class="signature-table">
@@ -258,7 +236,7 @@
                     <table style="width: 100%;">
                         <tr>
                             <td class="signature-box" style="width: 50%;">
-                                <div style="font-size: 11px; font-weight: bold;">Loket Scanner</div>
+                                <div style="font-size: 11px; font-weight: bold;">{{ $requiresCheckin ? 'Loket Scanner' : 'Peserta / Pemohon' }}</div>
                                 <div class="ttd-space"></div>
                                 <div style="font-size: 11px;">( .............................................. )</div>
                             </td>

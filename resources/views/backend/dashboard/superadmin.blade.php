@@ -20,24 +20,36 @@
 
     <div class="flex flex-col min-h-[70vh]">
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 shrink-0">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 shrink-0">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center">
+                <div class="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xl mr-4 shrink-0"><i class="fa-solid fa-layer-group"></i></div>
+                <div><p class="text-sm text-gray-500 font-bold">Event Aktif</p><p class="text-2xl font-black text-gray-800">{{ $stats['events_active'] }} Event</p></div>
+            </div>
             <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center">
                 <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl mr-4 shrink-0"><i class="fa-solid fa-ticket"></i></div>
-                <div><p class="text-sm text-gray-500 font-bold">Total Pendaftar</p><p class="text-2xl font-black text-gray-800">{{ $stats['total'] }} Siswa</p></div>
+                <div><p class="text-sm text-gray-500 font-bold">Total Pendaftar</p><p class="text-2xl font-black text-gray-800">{{ $stats['total'] }} Orang</p></div>
             </div>
             <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center">
                 <div class="w-12 h-12 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center text-xl mr-4 shrink-0"><i class="fa-solid fa-school"></i></div>
-                <div><p class="text-sm text-gray-500 font-bold">Hadir di Lokasi</p><p class="text-2xl font-black text-gray-800">{{ $stats['hadir'] }} Siswa</p></div>
+                <div><p class="text-sm text-gray-500 font-bold">Hadir di Lokasi</p><p class="text-2xl font-black text-gray-800">{{ $stats['hadir'] }} Orang</p></div>
             </div>
             <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center">
                 <div class="w-12 h-12 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xl mr-4 shrink-0"><i class="fa-solid fa-check-double"></i></div>
-                <div><p class="text-sm text-gray-500 font-bold">Selesai Dilayani</p><p class="text-2xl font-black text-gray-800">{{ $stats['selesai'] }} Siswa</p></div>
+                <div><p class="text-sm text-gray-500 font-bold">Selesai Dilayani</p><p class="text-2xl font-black text-gray-800">{{ $stats['selesai'] }} Orang</p></div>
             </div>
         </div>
 
         <h2 class="text-lg font-bold text-gray-800 mb-4 shrink-0"><i class="fa-solid fa-grid-2 text-blue-600 mr-2"></i> Menu Navigasi Utama</h2>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 shrink-0">
+
+            <a href="{{ route('admin.manage_events') }}" class="group bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-indigo-400 transition flex items-center gap-4 text-left">
+                <div class="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center text-2xl shrink-0 group-hover:scale-110 transition"><i class="fa-solid fa-layer-group"></i></div>
+                <div>
+                    <h2 class="text-sm font-black text-gray-800 mb-0.5">Manajemen Event</h2>
+                    <p class="text-gray-500 text-[10px] leading-tight">Nama Event & Field Form Dinamis.</p>
+                </div>
+            </a>
 
             <button onclick="openSpmbModal()" class="group bg-gradient-to-br from-gray-900 to-gray-800 p-4 rounded-xl shadow-lg border border-gray-700 hover:shadow-xl hover:border-yellow-400 transition flex items-center gap-4 text-left">
                 <div class="w-14 h-14 bg-gray-800 text-yellow-400 border border-gray-600 rounded-lg flex items-center justify-center text-2xl shrink-0 group-hover:scale-110 transition">
@@ -61,7 +73,7 @@
                 <div class="w-14 h-14 bg-green-50 text-green-600 rounded-lg flex items-center justify-center text-2xl shrink-0 group-hover:scale-110 transition"><i class="fa-solid fa-users-gear"></i></div>
                 <div>
                     <h2 class="text-sm font-black text-gray-800 mb-0.5">Manajemen Akun</h2>
-                    <p class="text-gray-500 text-[10px] leading-tight">Kelola Petugas Loket & Scanner.</p>
+                    <p class="text-gray-500 text-[10px] leading-tight">{{ ($hasCheckinEvents ?? false) ? 'Kelola Petugas Loket & Scanner.' : 'Kelola Petugas Loket & Go-Show.' }}</p>
                 </div>
             </a>
 
@@ -90,6 +102,16 @@
                 <div>
                     <h2 class="text-sm font-black text-gray-800 mb-0.5">Buka Layar Monitor</h2>
                     <p class="text-gray-500 text-[10px] leading-tight">Tampilan TV Aula (Tab Baru).</p>
+                </div>
+            </a>
+
+            <a href="{{ route('admin.backup_db') }}" class="group bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-emerald-400 transition flex items-center gap-4 text-left">
+                <div class="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center text-2xl shrink-0 group-hover:scale-110 transition">
+                    <i class="fa-solid fa-database"></i>
+                </div>
+                <div>
+                    <h2 class="text-sm font-black text-gray-800 mb-0.5">Backup Database (.sql)</h2>
+                    <p class="text-gray-500 text-[10px] leading-tight">Unduh Cadangan Lengkap Data &amp; Event.</p>
                 </div>
             </a>
 

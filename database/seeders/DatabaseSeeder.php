@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Event;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -13,6 +14,27 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // 0. Event Default Awal (dapat diedit / ditambah dari menu Manajemen Event)
+        Event::firstOrCreate(
+            ['slug' => 'pelayanan-spmb'],
+            [
+                'name' => 'Pelayanan Verifikasi Berkas SPMB',
+                'subtitle' => 'SMK Negeri 1 Adiwerna',
+                'description' => 'Silakan lengkapi formulir di bawah ini untuk memperoleh nomor antrian dan e-Tiket QR Code.',
+                'identifier_label' => 'NISN',
+                'identifier_placeholder' => 'Ketik 10 Digit NISN...',
+                'name_label' => 'Nama Lengkap (Sesuai Ijazah)',
+                'form_fields' => Event::defaultFormFields(),
+                'checklist_items' => [
+                    'Membawa dokumen asli & fotokopi persyaratan sesuai ketentuan event',
+                    'Menyiapkan e-Tiket ini saat nomor antrian dipanggil menuju loket pelayanan',
+                ],
+                'confirmation_text' => 'Saya menyatakan data yang saya isikan di atas sudah benar dan sesuai.',
+                'requires_checkin' => false,
+                'is_active' => true,
+            ]
+        );
+
         // 1. Akun Super Admin
         User::firstOrCreate(
             ['email' => 'admin@smkn1adw.sch.id'],

@@ -4,6 +4,7 @@
 @php
     // 🔥 VAKSIN LOKALISASI: Memaksa Carbon berbahasa Indonesia!
     \Carbon\Carbon::setLocale('id');
+    $requiresCheckin = (bool) ($ticket->event?->requires_checkin ?? false);
 @endphp
 
 <div class="max-w-lg w-full bg-white p-8 rounded-2xl shadow-xl border border-gray-100 text-center">
@@ -12,8 +13,15 @@
         <i class="fa-solid fa-check text-3xl text-green-600"></i>
     </div>
     
-    <h2 class="text-2xl font-extrabold text-gray-900 mb-2">Pendaftaran Berhasil!</h2>
-    <p class="text-gray-500 text-sm mb-6">Tunjukkan QR Code ini kepada <span class="font-bold text-gray-800">Petugas OSIS di Gerbang</span> untuk Check-In.</p>
+    <h2 class="text-2xl font-extrabold text-gray-900 mb-1">Pendaftaran Berhasil!</h2>
+    @if($ticket->event)
+        <p class="text-xs font-black uppercase tracking-widest text-blue-600 mb-2">{{ $ticket->event->name }}</p>
+    @endif
+    @if($requiresCheckin)
+        <p class="text-gray-500 text-sm mb-6">Tunjukkan QR Code ini kepada <span class="font-bold text-gray-800">Petugas Scanner di Lokasi</span> untuk Check-In.</p>
+    @else
+        <p class="text-gray-500 text-sm mb-6">Nomor antrian Anda sudah aktif. Pantau panggilan pada <span class="font-bold text-gray-800">Layar Aula</span> atau halaman ini.</p>
+    @endif
 
     <div class="bg-blue-50 rounded-xl p-6 border border-blue-100 mb-4 relative overflow-hidden">
         <p class="text-sm text-blue-800 font-semibold mb-1">NOMOR ANTRIAN ANDA</p>
@@ -46,10 +54,11 @@
                     $statusIcon = 'fa-clock';
                     $statusColor = 'text-yellow-600';
                 } elseif ($ticket->status == 'hadir_di_lokasi') {
-                    $statusText = 'Hadir di Lokasi';
+                    $statusText = $requiresCheckin ? 'Hadir di Lokasi' : 'Terdaftar di Antrian';
                     $statusIcon = 'fa-check-double';
                     $statusColor = 'text-green-600';
-                    $infoText = '<span class="text-green-500 font-bold">Menunggu antrian dipanggil...</span>';
+                    $timeText = '± ' . ($estimasiWaktu ?? 0) . ' Menit';
+                    $infoText = '<span class="text-green-500 font-bold">Terdapat ' . ($antrianDiDepan ?? 0) . ' antrian di depan Anda.</span>';
                 } elseif ($ticket->status == 'dipanggil') {
                     $statusText = 'SEDANG DIPANGGIL!';
                     $statusIcon = 'fa-bullhorn';
@@ -116,7 +125,7 @@
     
     <img src="data:image/svg+xml;base64,{{ $base64Qr }}" alt="QR Code Antrian" class="w-48 h-48 mx-auto">
     
-    <p class="text-xs text-gray-400 mt-2 font-bold uppercase tracking-widest">Scan untuk Check-in</p>
+    <p class="text-xs text-gray-400 mt-2 font-bold uppercase tracking-widest">{{ $requiresCheckin ? 'Scan untuk Check-in' : 'QR Code e-Tiket Antrian' }}</p>
 </div>
 
     <div class="flex flex-col sm:flex-row gap-3 justify-center mt-4">
@@ -153,7 +162,7 @@
                         infoText.innerHTML = '<span class="text-red-500 font-bold">Lakukan Check-In di Gerbang agar estimasi waktu muncul.</span>';
                     } else if(data.status === 'hadir_di_lokasi') {
                         statusText.className = 'text-xs font-bold text-green-600';
-                        statusText.innerHTML = '<i class="fa-solid fa-check-double"></i> Hadir di Lokasi';
+                        statusText.innerHTML = `<i class="fa-solid fa-check-double"></i> ${@json($requiresCheckin ? 'Hadir di Lokasi' : 'Terdaftar di Antrian')}`;
                         timeText.innerText = '± ' + data.estimasi_waktu + ' Menit';
                         infoText.innerHTML = `<span class="text-green-500 font-bold">Terdapat ${data.antrian_di_depan} antrian di depan Anda.</span>`;
                     } else if(data.status === 'dipanggil') {

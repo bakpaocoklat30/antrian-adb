@@ -3,35 +3,45 @@
 <div class="max-w-md mx-auto w-full relative">
 
     <div class="bg-white p-6 rounded-2xl shadow-xl border border-gray-100 text-center mb-4 relative z-10">
-        <h2 class="text-2xl font-black text-gray-800">Scanner Check-In Antrian</h2>
-        <p class="text-sm text-gray-500 mb-4">Scan QR Code tiket siswa atau ketik NISN / Nomor Tiket manual.</p>
+        @if($hasCheckinEvents)
+            <h2 class="text-2xl font-black text-gray-800">Scanner Check-In Antrian</h2>
+            <p class="text-sm text-gray-500 mb-4">Scan QR Code tiket peserta atau ketik Identitas / Nomor Tiket manual.</p>
 
-        <div id="reader" class="w-full overflow-hidden rounded-xl border-4 border-blue-100 mb-4 bg-black aspect-square flex items-center justify-center relative transition-colors duration-300">
-            <i class="fa-solid fa-qrcode text-5xl text-gray-600 absolute z-0 opacity-50"></i>
-        </div>
+            <div id="reader" class="w-full overflow-hidden rounded-xl border-4 border-blue-100 mb-4 bg-black aspect-square flex items-center justify-center relative transition-colors duration-300">
+                <i class="fa-solid fa-qrcode text-5xl text-gray-600 absolute z-0 opacity-50"></i>
+            </div>
 
-        <button id="startBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-4 rounded-xl shadow-lg transition mb-3 flex items-center justify-center gap-2 text-lg">
-            <i class="fa-solid fa-camera"></i> Mulai Kamera
-        </button>
-
-        <button id="stopBtn" class="w-full bg-red-100 hover:bg-red-200 text-red-600 font-bold py-3 px-4 rounded-xl transition mb-3 hidden flex items-center justify-center gap-2">
-            <i class="fa-solid fa-stop"></i> Matikan Kamera
-        </button>
-
-        <div class="flex items-center gap-2 my-3">
-            <hr class="flex-1 border-gray-200">
-            <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Atau Input Manual</span>
-            <hr class="flex-1 border-gray-200">
-        </div>
-
-        <form onsubmit="submitManualCheckin(event)" class="flex gap-2 mb-4">
-            <input type="text" id="manualTicketInput" placeholder="NISN atau No. Tiket..." class="flex-1 px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm font-bold text-center focus:ring-2 focus:ring-blue-500 outline-none">
-            <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-3 rounded-xl font-bold text-sm transition">
-                <i class="fa-solid fa-check"></i> Check-In
+            <button id="startBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-4 rounded-xl shadow-lg transition mb-3 flex items-center justify-center gap-2 text-lg">
+                <i class="fa-solid fa-camera"></i> Mulai Kamera
             </button>
-        </form>
 
-        <div id="resultBox" class="hidden p-4 rounded-lg font-bold text-sm mb-4"></div>
+            <button id="stopBtn" class="w-full bg-red-100 hover:bg-red-200 text-red-600 font-bold py-3 px-4 rounded-xl transition mb-3 hidden flex items-center justify-center gap-2">
+                <i class="fa-solid fa-stop"></i> Matikan Kamera
+            </button>
+
+            <div class="flex items-center gap-2 my-3">
+                <hr class="flex-1 border-gray-200">
+                <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Atau Input Manual</span>
+                <hr class="flex-1 border-gray-200">
+            </div>
+
+            <form onsubmit="submitManualCheckin(event)" class="flex gap-2 mb-4">
+                <input type="text" id="manualTicketInput" placeholder="Identitas atau No. Tiket..." class="flex-1 px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm font-bold text-center focus:ring-2 focus:ring-blue-500 outline-none">
+                <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-3 rounded-xl font-bold text-sm transition">
+                    <i class="fa-solid fa-check"></i> Check-In
+                </button>
+            </form>
+
+            <div id="resultBox" class="hidden p-4 rounded-lg font-bold text-sm mb-4"></div>
+        @else
+            <div class="w-16 h-16 bg-orange-50 text-orange-500 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-3 border border-orange-100">
+                <i class="fa-solid fa-ticket"></i>
+            </div>
+            <h2 class="text-2xl font-black text-gray-800 mb-1">Pendaftaran Offline (Go-Show)</h2>
+            <p class="text-xs text-gray-500 bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4 leading-relaxed">
+                Menu Check-In dinonaktifkan karena seluruh event aktif saat ini langsung memasukkan pendaftar ke antrian loket.
+            </p>
+        @endif
 
         <button onclick="openGoShowModal()" class="w-full mt-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2">
             <i class="fa-solid fa-ticket"></i> Buat Tiket Go-Show (Offline)
@@ -59,56 +69,39 @@
             </div>
 
             <div class="p-5">
+                @if($activeEvents->isEmpty())
+                    <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-4 text-sm font-semibold text-center">
+                        Belum ada event aktif saat ini. Hubungi Super Admin untuk mengaktifkan event terlebih dahulu.
+                    </div>
+                @else
                 <form id="goShowForm" onsubmit="submitGoShow(event)">
                     @csrf
                     <div class="space-y-4">
                         <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1">NISN *</label>
-                            <input type="number" name="nisn" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-gray-50">
+                            <label class="block text-xs font-bold text-gray-600 mb-1">Pilih Event *</label>
+                            <select name="event_id" id="goShowEventSelect" onchange="renderGoShowFields()" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-gray-50 font-semibold">
+                                @foreach($activeEvents as $event)
+                                    <option value="{{ $event->id }}">{{ $event->name }}</option>
+                                @endforeach
+                            </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1">Nama Lengkap CPD *</label>
-                            <input type="text" name="nama_cpd" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-gray-50">
+                            <label id="goShowIdentifierLabel" class="block text-xs font-bold text-gray-600 mb-1">Identitas *</label>
+                            <input type="text" name="nisn" id="goShowIdentifierInput" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-gray-50">
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1">Asal Sekolah *</label>
-                            <input type="text" name="asal_sekolah" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-gray-50">
+                            <label id="goShowNameLabel" class="block text-xs font-bold text-gray-600 mb-1">Nama Lengkap *</label>
+                            <input type="text" name="nama_cpd" id="goShowNameInput" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-gray-50">
                         </div>
 
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-2">Data Kesejahteraan (Opsional)</label>
-                            <div class="flex items-center gap-4 bg-gray-50 px-4 py-3 rounded-xl border border-gray-200">
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="checkbox" id="cb_kip" value="KIP" class="w-4 h-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded">
-                                    <span class="text-sm font-bold text-gray-700">Punya KIP</span>
-                                </label>
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="checkbox" id="cb_dtks" value="DTKS" class="w-4 h-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded">
-                                    <span class="text-sm font-bold text-gray-700">Punya DTKS</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <div class="flex gap-4">
-                            <div class="w-1/2">
-                                <label class="block text-xs font-bold text-gray-600 mb-1">No. WhatsApp *</label>
-                                <input type="number" name="whatsapp" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-gray-50">
-                            </div>
-                            <div class="w-1/2">
-                                <label class="block text-xs font-bold text-gray-600 mb-1">Email Aktif *</label>
-                                <input type="email" name="email" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-gray-50">
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1">Alamat Rumah Lengkap *</label>
-                            <textarea name="alamat" required rows="2" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-gray-50"></textarea>
-                        </div>
+                        <div id="goShowDynamicFields" class="space-y-4"></div>
                     </div>
 
                     <button type="submit" id="btnSubmitGoShow" class="w-full mt-6 bg-orange-600 hover:bg-orange-700 text-white font-bold py-4 rounded-xl shadow-lg transition flex justify-center items-center gap-2">
                         <i class="fa-solid fa-paper-plane"></i> Buat & Masukkan Antrian
                     </button>
                 </form>
+                @endif
             </div>
         </div>
     </div>
@@ -119,6 +112,14 @@
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+    const SCANNER_EVENTS = @json($activeEvents);
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, function(ch) {
+            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+        });
+    }
+
     function playBeep(isSuccess) {
         try {
             const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -188,6 +189,7 @@
                 let sisaAntrian = data.antrian_di_depan !== undefined ? data.antrian_di_depan : '-';
                 let estimasi = data.estimasi_waktu !== undefined ? data.estimasi_waktu + ' Menit' : '-';
                 let nomorPendek = data.ticket_short || rawInput.split('-')[0];
+                let eventBadge = data.event_name ? `<div class="text-xs font-black text-indigo-700 mb-1 uppercase tracking-wide">${escapeHtml(data.event_name)}</div>` : '';
 
                 Swal.fire({
                     title: 'Check-In Berhasil!',
@@ -195,16 +197,19 @@
                         <div class="text-left mt-2">
                             <div class="bg-blue-50 p-3 rounded-xl border border-blue-200 mb-4 text-sm text-blue-800 flex items-center gap-3 shadow-sm">
                                 <i class="fa-solid fa-check-circle text-3xl"></i>
-                                <span>Tiket Antrian <b class="text-blue-900">${nomorPendek}</b> resmi terdaftar!</span>
+                                <div>
+                                    ${eventBadge}
+                                    <span>Tiket Antrian <b class="text-blue-900">${escapeHtml(nomorPendek)}</b> resmi terdaftar!</span>
+                                </div>
                             </div>
                             <div class="flex justify-between bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner">
                                 <div class="text-center w-1/2 border-r border-slate-200 px-2">
                                     <span class="block text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Antrian di Depan</span>
-                                    <span class="text-4xl font-black text-blue-600">${sisaAntrian}</span>
+                                    <span class="text-4xl font-black text-blue-600">${escapeHtml(sisaAntrian)}</span>
                                 </div>
                                 <div class="text-center w-1/2 px-2">
                                     <span class="block text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Estimasi Waktu</span>
-                                    <span class="text-4xl font-black text-yellow-500">${estimasi}</span>
+                                    <span class="text-4xl font-black text-yellow-500">${escapeHtml(estimasi)}</span>
                                 </div>
                             </div>
                         </div>
@@ -230,7 +235,7 @@
         const inputEl = document.getElementById('manualTicketInput');
         const val = inputEl.value.trim();
         if (!val) {
-            Swal.fire('Peringatan', 'Masukkan NISN atau Nomor Tiket terlebih dahulu.', 'warning');
+            Swal.fire('Peringatan', 'Masukkan Identitas atau Nomor Tiket terlebih dahulu.', 'warning');
             return;
         }
         processCheckin(val, false);
@@ -247,7 +252,7 @@
         });
     }
 
-    document.getElementById('startBtn').addEventListener('click', function () {
+    document.getElementById('startBtn')?.addEventListener('click', function () {
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
 
@@ -276,7 +281,7 @@
             });
     });
 
-    document.getElementById('stopBtn').addEventListener('click', function () {
+    document.getElementById('stopBtn')?.addEventListener('click', function () {
         if (html5QrCode) {
             html5QrCode.stop().then(() => {
                 document.getElementById('startBtn').classList.remove('hidden');
@@ -289,14 +294,81 @@
 
     @if(session('error')) Swal.fire('Error', '{{ session('error') }}', 'error'); @endif
 
+    function renderGoShowFields() {
+        const selectEl = document.getElementById('goShowEventSelect');
+        const container = document.getElementById('goShowDynamicFields');
+        if (!selectEl || !container) return;
+
+        const ev = SCANNER_EVENTS.find(item => String(item.id) === String(selectEl.value));
+        if (!ev) return;
+
+        document.getElementById('goShowIdentifierLabel').textContent = (ev.identifier_label || 'Identitas') + ' *';
+        document.getElementById('goShowIdentifierInput').placeholder = ev.identifier_placeholder || ('Masukkan ' + (ev.identifier_label || 'Identitas'));
+        document.getElementById('goShowNameLabel').textContent = (ev.name_label || 'Nama Lengkap') + ' *';
+
+        const fields = Array.isArray(ev.form_fields) ? ev.form_fields : [];
+        const inputClass = 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-gray-50';
+
+        container.innerHTML = fields.map(f => {
+            const key = escapeHtml(f.key || '');
+            const label = escapeHtml(f.label || key) + (f.required ? ' *' : '');
+            const placeholder = escapeHtml(f.placeholder || '');
+            const reqAttr = f.required ? 'required' : '';
+            const type = f.type || 'text';
+            const options = Array.isArray(f.options) ? f.options : [];
+
+            if (type === 'textarea') {
+                return `<div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">${label}</label>
+                    <textarea name="fields[${key}]" rows="2" placeholder="${placeholder}" ${reqAttr} class="${inputClass}"></textarea>
+                </div>`;
+            }
+
+            if (type === 'select') {
+                const optsHtml = options.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('');
+                return `<div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">${label}</label>
+                    <select name="fields[${key}]" ${reqAttr} class="${inputClass}">
+                        <option value="">-- Pilih ${escapeHtml(f.label || '')} --</option>
+                        ${optsHtml}
+                    </select>
+                </div>`;
+            }
+
+            if (type === 'checkbox') {
+                const cbsHtml = options.map(o => `
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="fields[${key}][]" value="${escapeHtml(o)}" class="w-4 h-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded">
+                        <span class="text-sm font-bold text-gray-700">${escapeHtml(o)}</span>
+                    </label>
+                `).join('');
+                return `<div>
+                    <label class="block text-xs font-bold text-gray-600 mb-2">${label}</label>
+                    <div class="flex flex-wrap items-center gap-4 bg-gray-50 px-4 py-3 rounded-xl border border-gray-200">${cbsHtml}</div>
+                </div>`;
+            }
+
+            const htmlType = (type === 'number' || type === 'email') ? type : 'text';
+            return `<div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">${label}</label>
+                <input type="${htmlType}" name="fields[${key}]" placeholder="${placeholder}" ${reqAttr} class="${inputClass}">
+            </div>`;
+        }).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', renderGoShowFields);
+
     function openGoShowModal() {
         if (html5QrCode && html5QrCode.getState() === 2) { html5QrCode.pause(true); }
+        renderGoShowFields();
         document.getElementById('goShowModal').classList.remove('hidden');
     }
 
     function closeGoShowModal() {
         document.getElementById('goShowModal').classList.add('hidden');
-        document.getElementById('goShowForm').reset();
+        const form = document.getElementById('goShowForm');
+        if (form) form.reset();
+        renderGoShowFields();
         if (html5QrCode && html5QrCode.getState() === 3) { html5QrCode.resume(); }
     }
 
@@ -306,16 +378,6 @@
         let form = document.getElementById('goShowForm');
         let formData = new FormData(form);
         let btnSubmit = document.getElementById('btnSubmitGoShow');
-
-        let isKip = document.getElementById('cb_kip').checked;
-        let isDtks = document.getElementById('cb_dtks').checked;
-        let jalur = 'REGULER';
-
-        if (isKip && isDtks) { jalur = 'KIP & DTKS'; }
-        else if (isKip) { jalur = 'KIP'; }
-        else if (isDtks) { jalur = 'DTKS'; }
-
-        formData.append('jalur_pendaftaran', jalur);
 
         let originalText = btnSubmit.innerHTML;
         btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memproses...';
@@ -332,9 +394,9 @@
             btnSubmit.disabled = false;
 
             if (obj.status === 422) {
-                let errors = obj.body.errors;
-                let errorMsg = Object.values(errors).map(e => e.join('\n')).join('\n');
-                Swal.fire('Validasi Gagal!', errorMsg, 'error');
+                let errors = obj.body.errors || {};
+                let errorMsg = Object.values(errors).map(err => Array.isArray(err) ? err.join('\n') : err).join('\n');
+                Swal.fire('Validasi Gagal!', errorMsg || obj.body.message || 'Periksa kembali isian.', 'error');
                 return;
             }
 
@@ -344,17 +406,18 @@
                 Swal.fire({
                     title: 'TIKET OFFLINE BERHASIL!',
                     html: `
-                        <p class="text-sm text-gray-500 mb-2">Siswa <b>${obj.body.nama_cpd}</b> telah masuk ke antrian.</p>
+                        <p class="text-xs font-black text-indigo-700 uppercase tracking-wide mb-1">${escapeHtml(obj.body.event_name || '')}</p>
+                        <p class="text-sm text-gray-500 mb-2">Peserta <b>${escapeHtml(obj.body.nama_cpd)}</b> telah masuk ke antrian.</p>
                         <p class="text-xs text-red-500 italic mb-4">*Silakan foto nomor di bawah ini sebagai bukti!</p>
                         <div class="bg-gradient-to-br from-orange-100 to-amber-50 p-6 rounded-2xl border-2 border-orange-400 border-dashed shadow-inner">
                             <span class="block text-xs uppercase font-black text-orange-400 tracking-widest mb-1">KODE GO-SHOW</span>
-                            <span class="text-6xl font-black text-orange-600 tracking-tighter">${obj.body.ticket_number}</span>
+                            <span class="text-6xl font-black text-orange-600 tracking-tighter">${escapeHtml(obj.body.ticket_number)}</span>
                         </div>
                     `,
                     icon: 'success', confirmButtonColor: '#ea580c', confirmButtonText: 'Selesai & Lanjut Jaga'
                 });
             } else {
-                Swal.fire('Gagal!', obj.body.message, 'error');
+                Swal.fire('Gagal!', obj.body.message || 'Gagal membuat tiket.', 'error');
             }
         })
         .catch(() => {

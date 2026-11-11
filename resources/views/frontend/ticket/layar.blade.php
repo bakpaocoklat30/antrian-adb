@@ -52,7 +52,13 @@
             <img src="{{ asset('images/logo-adb.jpg') }}" alt="Logo" class="h-[7vh] w-auto object-contain rounded-full border-2 border-white bg-white p-0.5">
             <div>
                 <h1 class="text-2xl lg:text-3xl font-black tracking-widest uppercase leading-none text-white">SMK Negeri 1 Adiwerna</h1>
-                <p class="text-blue-400 font-bold text-sm lg:text-base mt-1.5 tracking-[0.3em] uppercase">Sistem Antrian Pelayanan ADB</p>
+                <p class="text-blue-400 font-bold text-sm lg:text-base mt-1.5 tracking-[0.2em] uppercase">
+                    @if(isset($activeEvents) && $activeEvents->count() === 1)
+                        {{ $activeEvents->first()->name }}
+                    @else
+                        Sistem Antrian Pelayanan ADB
+                    @endif
+                </p>
             </div>
         </div>
 
@@ -92,6 +98,7 @@
             </div>
 
             <div id="panggilanCard" class="h-[45%] glass-card rounded-2xl flex flex-col items-center justify-center relative overflow-hidden shadow-2xl transition-all duration-300">
+                <div id="activeEvent" class="hidden text-xs font-black tracking-[0.25em] uppercase bg-blue-900/70 text-blue-200 px-3 py-1 rounded-full border border-blue-500/40 mb-1"></div>
                 <div class="text-2xl lg:text-3xl font-black text-white tracking-[0.2em] mb-1 uppercase drop-shadow-lg">
                     LOKET <span id="activeLoket" class="text-yellow-400 ml-1">--</span>
                 </div>
@@ -172,6 +179,7 @@
     <script> let baseVol = parseInt("{{ $setting->video_volume ?? 60 }}"); </script>
     @endif
 
+    <script src="{{ asset('js/disapa-tts.js') }}"></script>
     <script>
         let playedSignatures = new Set();
         let audioQueue = [];
@@ -183,10 +191,11 @@
         let globalWaiting = [];
 
         let activeCallId = 0;
-        window.currentUtt = null;
+        let activeBellAudio = null;
         let lastPlayTime = Date.now();
 
-        let voiceSpeed = parseFloat("{{ $setting->voice_speed ?? 0.8 }}");
+        let voiceEngine = "{{ $setting->voice_engine ?? 'server_id' }}";
+        let voiceSpeed = parseFloat("{{ $setting->voice_speed ?? 1.0 }}");
         let voicePitch = parseFloat("{{ $setting->voice_pitch ?? 1.0 }}");
 
         function startLayar() {
@@ -196,9 +205,7 @@
                 document.getElementById('startOverlay').classList.add('hidden');
             }, 700);
 
-            let dummyTts = new SpeechSynthesisUtterance('');
-            dummyTts.volume = 0;
-            window.speechSynthesis.speak(dummyTts);
+            DisapaTts.unlock();
 
             let localVid = document.getElementById('bgVideoLocal');
             if (localVid) {
@@ -258,27 +265,26 @@
             document.getElementById('realtimeDate').innerText = now.toLocaleDateString('id-ID', options);
         }, 1000);
 
-        function formatForSpeech(str) {
-            const m = {
-                '0': 'Nol', '1': 'Satu', '2': 'Dua', '3': 'Tiga', '4': 'Empat',
-                '5': 'Lima', '6': 'Enam', '7': 'Tujuh', '8': 'Delapan', '9': 'Sembilan'
-            };
-
-            let r = [];
-            for (let i = 0; i < str.length; i++) {
-                let c = str[i].toUpperCase();
-                r.push(m[c] ? m[c] : c);
-            }
-            return r.join('... ');
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text ?? '';
+            return div.innerHTML;
         }
 
         function renderLayar() {
             const ticketEl = document.getElementById('activeTicket');
             const loketEl = document.getElementById('activeLoket');
+            const eventEl = document.getElementById('activeEvent');
 
             if (visualActive) {
                 ticketEl.innerText = visualActive.ticket;
                 loketEl.innerText = visualActive.loket;
+                if (visualActive.event_name) {
+                    eventEl.innerText = visualActive.event_name;
+                    eventEl.classList.remove('hidden');
+                } else {
+                    eventEl.classList.add('hidden');
+                }
             }
 
             const loketContainer = document.getElementById('loketContainer');
@@ -287,17 +293,18 @@
 
                 globalLokets.forEach(l => {
                     let contentHtml = '';
+                    let safeTicket = escapeHtml(l.ticket);
 
                     if (l.is_tutup) {
-                        contentHtml = `<div class="text-xl lg:text-2xl xl:text-3xl font-black text-yellow-400 drop-shadow-md tracking-widest uppercase text-center leading-tight mt-1 px-1 flex-1 flex items-center justify-center">${l.ticket}</div>`;
+                        contentHtml = `<div class="text-xl lg:text-2xl xl:text-3xl font-black text-yellow-400 drop-shadow-md tracking-widest uppercase text-center leading-tight mt-1 px-1 flex-1 flex items-center justify-center">${safeTicket}</div>`;
                     } else {
                         let isBlank = (l.ticket === '---');
-                        contentHtml = `<div class="text-4xl lg:text-5xl xl:text-6xl font-black ${isBlank ? 'text-slate-600' : 'text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]'} -mt-1 flex-1 flex items-center justify-center">${l.ticket}</div>`;
+                        contentHtml = `<div class="text-4xl lg:text-5xl xl:text-6xl font-black ${isBlank ? 'text-slate-600' : 'text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]'} -mt-1 flex-1 flex items-center justify-center">${safeTicket}</div>`;
                     }
 
                     loketHtml += `<div class="flex-1 glass-card rounded-xl flex flex-col items-center justify-center shadow-lg px-2 py-2 transition-all border-[3px]">
                         <div class="text-sm lg:text-base xl:text-lg font-bold text-blue-300 uppercase tracking-widest mb-1 shrink-0">
-                            LOKET <span class="text-yellow-400 ml-1 text-base lg:text-xl xl:text-2xl font-black">${l.loket}</span>
+                            LOKET <span class="text-yellow-400 ml-1 text-base lg:text-xl xl:text-2xl font-black">${escapeHtml(l.loket)}</span>
                         </div>
                         ${contentHtml}
                     </div>`;
@@ -312,15 +319,19 @@
                 let waitingHtml = '';
 
                 globalWaiting.forEach(w => {
+                    let evTag = w.event_name ? `<div class="text-[10px] text-blue-300 font-semibold truncate">${escapeHtml(w.event_name)}</div>` : '';
                     waitingHtml += `<div class="flex items-center justify-between bg-blue-900/40 px-5 py-3.5 rounded-xl border border-blue-500/40 shadow-inner mb-2 last:mb-0">
-                        <div class="font-black text-yellow-400 text-2xl tracking-widest drop-shadow-sm">${w.ticket}</div>
-                        <div class="font-bold text-white text-sm md:text-base truncate uppercase text-right ml-2 w-2/3">${w.nama}</div>
+                        <div class="font-black text-yellow-400 text-2xl tracking-widest drop-shadow-sm">${escapeHtml(w.ticket)}</div>
+                        <div class="text-right ml-2 w-2/3">
+                            <div class="font-bold text-white text-sm md:text-base truncate uppercase">${escapeHtml(w.nama)}</div>
+                            ${evTag}
+                        </div>
                     </div>`;
                 });
 
                 waitingContainer.innerHTML = waitingHtml;
             } else if (waitingContainer) {
-                waitingContainer.innerHTML = '<div class="flex-1 flex flex-col items-center justify-center text-slate-600 font-bold italic"><i class="fa-solid fa-users-slash text-4xl mb-3"></i>Belum ada siswa hadir</div>';
+                waitingContainer.innerHTML = '<div class="flex-1 flex flex-col items-center justify-center text-slate-600 font-bold italic"><i class="fa-solid fa-users-slash text-4xl mb-3"></i>Belum ada peserta hadir</div>';
             }
         }
 
@@ -360,7 +371,6 @@
                 if (isFinished || myCallId !== activeCallId) return;
 
                 isFinished = true;
-                window.currentUtt = null;
 
                 setTimeout(() => {
                     executeNext(templateFormat);
@@ -377,57 +387,51 @@
         }
 
         function playTTSSequence(currentCall, myCallId, templateFormat, callback) {
-            let formattedNumber = formatForSpeech(currentCall.ticket);
-            let template = templateFormat || 'Nomor Antrian, {nomor}, silakan menuju ke, loket, {loket}';
-            let textToSpeak = template.replace('{nomor}', formattedNumber).replace('{loket}', currentCall.loket);
+            const textToSpeak = DisapaTts.buildAnnouncementText(templateFormat, currentCall.ticket, currentCall.loket);
+            DisapaTts.stop();
 
-            window.speechSynthesis.cancel();
-            window.speechSynthesis.resume();
-
-            let utt = new SpeechSynthesisUtterance(textToSpeak);
-            window.currentUtt = utt;
-            utt.lang = 'id-ID';
-            utt.volume = baseVol / 100;
-            utt.pitch = voicePitch;
-            utt.rate = voiceSpeed;
-
-            let voices = window.speechSynthesis.getVoices();
-            let indoVoices = voices.filter(v => v.lang.includes('id') || v.name.includes('Indonesian'));
-            let localIndoVoices = indoVoices.filter(v => v.localService);
-            let voicePool = localIndoVoices.length > 0 ? localIndoVoices : indoVoices;
-
-            if (voicePool.length > 0) {
-                utt.voice = voicePool[0];
+            if (activeBellAudio) {
+                try { activeBellAudio.pause(); activeBellAudio.src = ''; } catch (e) {}
+                activeBellAudio = null;
             }
 
-            let failsafe = setTimeout(() => {
-                if (myCallId === activeCallId) {
-                    window.speechSynthesis.cancel();
-                    callback();
-                }
-            }, 25000);
+            let spoke = false;
+            const startSpeech = () => {
+                if (spoke || myCallId !== activeCallId) return;
+                spoke = true;
+                clearTimeout(bellFallback);
 
-            utt.onend = function () { clearTimeout(failsafe); callback(); };
-            utt.onerror = function () { clearTimeout(failsafe); callback(); };
+                DisapaTts.speak(textToSpeak, {
+                    engine: voiceEngine,
+                    ttsUrl: "{{ route('api.tts') }}",
+                    speed: voiceSpeed,
+                    pitch: voicePitch,
+                    volume: baseVol / 100,
+                    shouldAbort: () => myCallId !== activeCallId || baseVol === 0,
+                    onEnd: () => callback(),
+                });
+            };
+
+            const bellFallback = setTimeout(startSpeech, 2600);
 
             setTimeout(() => {
-                if (myCallId !== activeCallId) return;
+                if (myCallId !== activeCallId) {
+                    clearTimeout(bellFallback);
+                    return;
+                }
 
-                let bell = new Audio("{{ asset('sounds/bell.mp3') }}");
+                const bell = new Audio("{{ asset('sounds/bell.mp3') }}");
+                activeBellAudio = bell;
                 bell.volume = baseVol / 100;
-                bell.play().catch(e => console.log(e));
-
-                setTimeout(() => {
-                    if (myCallId === activeCallId) {
-                        window.speechSynthesis.speak(utt);
-                    }
-                }, 1500);
-            }, 500);
+                bell.onended = () => setTimeout(startSpeech, 250);
+                bell.onerror = () => startSpeech();
+                bell.play().catch(() => startSpeech());
+            }, 350);
         }
 
         setInterval(() => {
             if (isProcessingQueue && (Date.now() - lastPlayTime > 35000)) {
-                window.speechSynthesis.cancel();
+                DisapaTts.stop();
                 isProcessingQueue = false;
                 activeCallId++;
 
@@ -441,7 +445,8 @@
                 .then(data => {
                     if (data.success) {
                         if (data.setting) {
-                            voiceSpeed = parseFloat(data.setting.voice_speed || 0.8);
+                            voiceEngine = data.setting.voice_engine || 'server_id';
+                            voiceSpeed = parseFloat(data.setting.voice_speed || 1.0);
                             voicePitch = parseFloat(data.setting.voice_pitch || 1.0);
 
                             let newBaseVol = parseInt(data.setting.video_volume);
@@ -449,7 +454,7 @@
                                 baseVol = newBaseVol;
 
                                 if (baseVol === 0) {
-                                    window.speechSynthesis.cancel();
+                                    DisapaTts.stop();
                                 }
 
                                 if (document.getElementById('bgVideoLocal')) {
@@ -515,7 +520,9 @@
                 }).catch(err => console.log('Polling Error:', err));
         }, 2000);
 
-        window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+        }
     </script>
 </body>
 </html>

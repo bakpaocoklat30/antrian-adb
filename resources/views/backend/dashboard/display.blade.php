@@ -105,21 +105,39 @@
             </div>
 
             <div>
-                <h3 class="text-lg font-black text-gray-800 mb-4"><i class="fa-solid fa-microphone-lines text-red-500 mr-2"></i> Pengaturan Mesin Suara TTS (Otomatis Tersimpan)</h3>
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                    <h3 class="text-lg font-black text-gray-800"><i class="fa-solid fa-microphone-lines text-red-500 mr-2"></i> Pengaturan Mesin Suara TTS (Otomatis Tersimpan)</h3>
+                    <button type="button" onclick="testVoice()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2 self-start sm:self-auto">
+                        <i class="fa-solid fa-volume-high"></i> Tes Panggil Suara
+                    </button>
+                </div>
+
+                <div class="bg-emerald-50/70 border border-emerald-200 p-4 rounded-xl mb-5">
+                    <label class="block text-sm font-bold text-gray-800 mb-2">Sumber Suara Bahasa Indonesia</label>
+                    <select id="voiceEngineSelect" onchange="syncLiveSetting('voice_engine', this.value); updateVoiceStatusBanner(); testVoice();" class="w-full rounded-lg border border-emerald-300 bg-white p-2.5 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-emerald-500">
+                        <option value="server_id" {{ ($setting->voice_engine ?? 'server_id') === 'server_id' ? 'selected' : '' }}>
+                            Suara Neural Indonesia (Server /api/tts + Cache — Paling Jelas di Semua Perangkat)
+                        </option>
+                        <option value="browser_id" {{ ($setting->voice_engine ?? 'server_id') === 'browser_id' ? 'selected' : '' }}>
+                            Suara Bawaan Browser (Web Speech Indonesia / Otomatis Fallback Server jika tidak ada)
+                        </option>
+                    </select>
+                    <p id="voiceSupportInfo" class="text-[11px] text-emerald-800 font-semibold mt-2"></p>
+                </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 relative shadow-sm">
                         <label class="block text-sm font-bold text-gray-700 mb-2">Kecepatan Bicara (Speed)</label>
                         <div class="flex items-center gap-3">
                             <i class="fa-solid fa-person-walking text-gray-400"></i>
-                            <input type="range" name="voice_speed" id="voiceSpeedInput" min="0.5" max="1.5" step="0.1" value="{{ $setting->voice_speed ?? 0.8 }}" oninput="document.getElementById('speedValue').innerText = this.value + 'x'" onchange="testVoice(); syncLiveSetting('voice_speed', this.value)" class="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer focus:outline-none">
+                            <input type="range" name="voice_speed" id="voiceSpeedInput" min="0.5" max="1.5" step="0.1" value="{{ $setting->voice_speed ?? 1.0 }}" oninput="document.getElementById('speedValue').innerText = this.value + 'x'" onchange="testVoice(); syncLiveSetting('voice_speed', this.value)" class="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer focus:outline-none">
                             <i class="fa-solid fa-person-running text-gray-600"></i>
                         </div>
-                        <div class="text-center mt-2 font-black text-blue-600 text-lg" id="speedValue">{{ $setting->voice_speed ?? 0.8 }}x</div>
+                        <div class="text-center mt-2 font-black text-blue-600 text-lg" id="speedValue">{{ $setting->voice_speed ?? 1.0 }}x</div>
                     </div>
 
                     <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 relative shadow-sm">
-                        <label class="block text-sm font-bold text-gray-700 mb-2">Nada Suara Dasar (Pitch)</label>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">Nada Suara Dasar (Pitch — Khusus Mode Browser)</label>
                         <div class="flex items-center gap-3">
                             <i class="fa-solid fa-microphone-lines-slash text-gray-400 text-sm"></i>
                             <input type="range" name="voice_pitch" id="voicePitchInput" min="0.5" max="2.0" step="0.1" value="{{ $setting->voice_pitch ?? 1.0 }}" oninput="document.getElementById('pitchValue').innerText = this.value" onchange="testVoice(); syncLiveSetting('voice_pitch', this.value)" class="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer focus:outline-none">
@@ -136,6 +154,7 @@
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="{{ asset('js/disapa-tts.js') }}"></script>
 <script>
     function toggleVideoInput() {
         let type = document.getElementById('videoType').value;
@@ -151,27 +170,44 @@
         }).catch(err => console.error(err));
     }
 
-    window.previewUtt = null; 
+    function updateVoiceStatusBanner() {
+        const infoEl = document.getElementById('voiceSupportInfo');
+        const engine = document.getElementById('voiceEngineSelect')?.value || 'server_id';
+        if (!infoEl) return;
+
+        const indoVoice = DisapaTts.pickBestIndonesianVoice();
+        const voiceNote = indoVoice
+            ? `Voice Indonesia browser terdeteksi: ${indoVoice.name} (${indoVoice.lang}).`
+            : 'Browser ini belum memiliki paket suara Indonesia bawaan (tanpa server TTS, suara default akan berbahasa Inggris).';
+
+        infoEl.textContent = engine === 'server_id'
+            ? `Aktif: Server Suara Bahasa Indonesia (/api/tts + cache MP3 lokal). ${voiceNote}`
+            : `Aktif: Voice Browser Indonesia (jika kosong, otomatis pindah ke /api/tts). ${voiceNote}`;
+    }
 
     function testVoice() {
-        let speed = parseFloat(document.getElementById('voiceSpeedInput').value);
-        let pitch = parseFloat(document.getElementById('voicePitchInput').value);
-        
-        window.speechSynthesis.cancel(); 
-        window.speechSynthesis.resume(); 
+        const engine = document.getElementById('voiceEngineSelect')?.value || 'server_id';
+        const speed = parseFloat(document.getElementById('voiceSpeedInput').value || '1.0');
+        const pitch = parseFloat(document.getElementById('voicePitchInput').value || '1.0');
+        const volEl = document.querySelector('input[name="video_volume"]');
+        const rawVol = volEl ? parseInt(volEl.value, 10) : 60;
+        const previewVol = rawVol === 0 ? 0.6 : (rawVol / 100);
+        const template = document.querySelector('textarea[name="announcer_text"]')?.value;
+        const sampleText = DisapaTts.buildAnnouncementText(template, 'A001', '1');
 
-        let utt = new SpeechSynthesisUtterance("Cek suara, satu dua tiga.");
-        window.previewUtt = utt; 
-        utt.lang = 'id-ID'; 
-        utt.rate = speed;
-        utt.pitch = pitch;
+        DisapaTts.unlock();
+        DisapaTts.speak(sampleText, {
+            engine: engine,
+            ttsUrl: '{{ route("api.tts") }}',
+            speed: speed,
+            pitch: pitch,
+            volume: previewVol,
+        });
+    }
 
-        let voices = window.speechSynthesis.getVoices();
-        let indoVoice = voices.find(v => v.lang.includes('id') || v.name.includes('Indonesian'));
-        if(indoVoice) utt.voice = indoVoice;
-
-        utt.onend = function() { window.previewUtt = null; };
-        window.speechSynthesis.speak(utt);
+    document.addEventListener('DOMContentLoaded', updateVoiceStatusBanner);
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = updateVoiceStatusBanner;
     }
 
     @if(session('success')) Swal.fire('Berhasil!', '{{ session('success') }}', 'success'); @endif

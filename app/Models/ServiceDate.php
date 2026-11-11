@@ -10,20 +10,26 @@ class ServiceDate extends Model
     use HasFactory;
 
     protected $fillable = [
+        'event_id',
         'service_date',
         'session_name',
-        'session_code', // 🔥 FITUR BARU: Tambahan Kode Sesi (Prefix)
+        'session_code',
         'start_time',
         'end_time',
         'quota',
         'booked_count',
-        'is_active'
+        'is_active',
     ];
 
     protected $casts = [
         'service_date' => 'date',
         'is_active' => 'boolean',
     ];
+
+    public function event()
+    {
+        return $this->belongsTo(Event::class);
+    }
 
     public function tickets()
     {

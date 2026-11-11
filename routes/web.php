@@ -5,8 +5,9 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\TicketController;
 use Illuminate\Support\Facades\Route;
 
-// 🌐 FRONTEND ANTRIAN PUBLIK
+// 🌐 FRONTEND ANTRIAN PUBLIK (MULTI-EVENT DINAMIS)
 Route::get('/', [TicketController::class, 'create'])->name('ticket.create');
+Route::get('/e/{slug}', [TicketController::class, 'showEvent'])->name('ticket.event');
 Route::post('/ticket', [TicketController::class, 'store'])->name('ticket.store');
 Route::post('/ticket/reprint', [TicketController::class, 'reprint'])->name('ticket.reprint');
 Route::get('/ticket/success/{ticket_number}', [TicketController::class, 'success'])->name('ticket.success');
@@ -15,6 +16,7 @@ Route::get('/ticket/download/{ticket_number}', [TicketController::class, 'downlo
 // 📺 LAYAR MONITOR AULA & LIVE TRACKER
 Route::get('/layar', [TicketController::class, 'layar'])->name('ticket.layar');
 Route::get('/api/layar', [TicketController::class, 'apiLayar'])->name('api.layar');
+Route::get('/api/tts', [TicketController::class, 'apiTts'])->middleware('throttle:120,1')->name('api.tts');
 Route::get('/api/ticket/live/{ticket_number}', [AdminController::class, 'liveMonitor'])->name('api.ticket.live');
 
 // 🔐 AUTHENTICATION
@@ -49,6 +51,13 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     Route::middleware(['role:super_admin'])->group(function () {
         Route::post('/dashboard/spmb-access', [AdminController::class, 'updateSpmbAccess'])->name('admin.spmb_access');
 
+        // Manajemen Event & Form Dinamis
+        Route::get('/manage-events', [AdminController::class, 'manageEvents'])->name('admin.manage_events');
+        Route::post('/events/store', [AdminController::class, 'storeEvent'])->name('admin.events.store');
+        Route::put('/events/{id}', [AdminController::class, 'updateEvent'])->name('admin.events.update');
+        Route::post('/events/{id}/toggle', [AdminController::class, 'toggleEvent'])->name('admin.events.toggle');
+        Route::delete('/events/{id}', [AdminController::class, 'destroyEvent'])->name('admin.events.destroy');
+
         // Manajemen Sesi & Kuota
         Route::get('/manage-sessions', [AdminController::class, 'manageSessions'])->name('admin.manage_sessions');
         Route::post('/service-date/store', [AdminController::class, 'storeServiceDate'])->name('admin.service_date.store');
@@ -69,7 +78,8 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
         Route::post('/manage-display', [AdminController::class, 'updateDisplay'])->name('admin.update_display');
         Route::post('/manage-display/live-setting', [AdminController::class, 'updateLiveSetting'])->name('admin.live_setting');
 
-        // Tracker Kehadiran
+        // Tracker Kehadiran & Backup Database
         Route::get('/attendance', [AdminController::class, 'attendanceTracker'])->name('admin.attendance');
+        Route::get('/backup-database', [AdminController::class, 'backupDatabase'])->name('admin.backup_db');
     });
 });

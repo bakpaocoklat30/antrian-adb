@@ -2,16 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Event;
 use App\Models\ServiceDate;
 use App\Models\Setting;
 use App\Models\Ticket;
 use App\Models\User;
+use App\Services\DatabaseBackupService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class AdminController extends Controller
 {
@@ -22,20 +25,24 @@ class AdminController extends Controller
                 'total' => Ticket::count(),
                 'hadir' => Ticket::whereIn('status', ['hadir_di_lokasi', 'dipanggil', 'menghadap', 'selesai'])->count(),
                 'selesai' => Ticket::where('status', 'selesai')->count(),
+                'events_active' => Event::where('is_active', true)->count(),
             ];
             $setting = Setting::first();
+            $hasCheckinEvents = Event::where('is_active', true)->where('requires_checkin', true)->exists();
 
-            return view('backend.dashboard.superadmin', compact('stats', 'setting'));
+            return view('backend.dashboard.superadmin', compact('stats', 'setting', 'hasCheckinEvents'));
         }
 
         $aPerPage = $request->query('a_per_page', 5);
 
-        $antrianHadir = Ticket::where('status', 'hadir_di_lokasi')
+        $antrianHadir = Ticket::with('event')
+            ->where('status', 'hadir_di_lokasi')
             ->orderBy('updated_at', 'asc')
             ->paginate($aPerPage, ['*'], 'a_page')
             ->appends($request->except('a_page'));
 
-        $riwayatHariIni = Ticket::where('loket_id', Auth::id())
+        $riwayatHariIni = Ticket::with('event')
+            ->where('loket_id', Auth::id())
             ->whereIn('status', ['dipanggil', 'menghadap', 'selesai', 'dilewati'])
             ->whereDate('updated_at', Carbon::today('Asia/Jakarta'))
             ->orderBy('updated_at', 'desc')
@@ -46,7 +53,10 @@ class AdminController extends Controller
 
     public function scanner()
     {
-        return view('backend.scanner.index');
+        $activeEvents = Event::where('is_active', true)->orderBy('id', 'asc')->get();
+        $hasCheckinEvents = $activeEvents->contains(fn (Event $event) => (bool) $event->requires_checkin);
+
+        return view('backend.scanner.index', compact('activeEvents', 'hasCheckinEvents'));
     }
 
     public function scannerCheckin(Request $request)
@@ -61,19 +71,33 @@ class AdminController extends Controller
             $input = end($parts);
         }
 
-        $ticket = Ticket::with('serviceDate')
+        $ticket = Ticket::with(['serviceDate', 'event'])
             ->where('ticket_number', $input)
-            ->orWhere('nisn', $input)
             ->first();
+
+        if (!$ticket) {
+            $ticket = Ticket::with(['serviceDate', 'event'])
+                ->where('nisn', $input)
+                ->whereHas('event', fn ($q) => $q->where('is_active', true))
+                ->orderBy('id', 'desc')
+                ->first();
+        }
 
         if (!$ticket || !$ticket->serviceDate) {
             return response()->json(['success' => false, 'message' => 'Tiket Tidak Dikenali / Tidak Terdaftar!']);
         }
 
+        if ($ticket->event && !$ticket->event->requires_checkin) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Event "' . $ticket->event->name . '" tidak menggunakan menu Check-In. Peserta langsung masuk antrian loket.',
+            ]);
+        }
+
         if (!$ticket->serviceDate->is_active) {
             return response()->json([
                 'success' => false,
-                'message' => 'DITOLAK! Sesi "' . $ticket->serviceDate->session_name . '" untuk tiket ini SUDAH DITUTUP oleh Admin. Siswa tidak dapat melakukan Check-in.',
+                'message' => 'DITOLAK! Sesi "' . $ticket->serviceDate->session_name . '" untuk tiket ini SUDAH DITUTUP oleh Admin. Peserta tidak dapat melakukan Check-in.',
             ]);
         }
 
@@ -84,19 +108,19 @@ class AdminController extends Controller
         if ($ticketDate < $today) {
             return response()->json([
                 'success' => false,
-                'message' => "Tiket KADALUARSA!\nJadwal siswa ini adalah $formattedTicketDate. Silakan arahkan siswa ke Meja Panitia untuk mutasi jadwal.",
+                'message' => "Tiket KADALUARSA!\nJadwal peserta ini adalah $formattedTicketDate. Silakan arahkan ke Meja Panitia untuk mutasi jadwal.",
             ]);
         }
 
         if ($ticketDate > $today) {
             return response()->json([
                 'success' => false,
-                'message' => "Tiket BELUM AKTIF!\nJadwal siswa ini untuk tanggal $formattedTicketDate. Tidak bisa Check-In hari ini.",
+                'message' => "Tiket BELUM AKTIF!\nJadwal peserta ini untuk tanggal $formattedTicketDate. Tidak bisa Check-In hari ini.",
             ]);
         }
 
         if ($ticket->status === 'hadir_di_lokasi') {
-            return response()->json(['success' => false, 'message' => 'Siswa ini SUDAH Check-In sebelumnya!']);
+            return response()->json(['success' => false, 'message' => 'Peserta ini SUDAH Check-In sebelumnya!']);
         }
 
         if ($ticket->status !== 'menunggu') {
@@ -106,24 +130,144 @@ class AdminController extends Controller
         $ticket->status = 'hadir_di_lokasi';
         $ticket->save();
 
-        $antrianDiDepan = Ticket::where('service_date_id', $ticket->service_date_id)
-            ->where('status', 'hadir_di_lokasi')
-            ->where('updated_at', '<', $ticket->updated_at ?? now())
-            ->count();
+        $antrianDiDepan = $this->countAheadInQueue($ticket);
 
         return response()->json([
             'success' => true,
             'message' => 'Check-In Berhasil! ' . $ticket->nama_cpd,
+            'event_name' => $ticket->event?->name ?? 'Antrian',
             'ticket_short' => explode('-', $ticket->ticket_number)[0],
             'antrian_di_depan' => $antrianDiDepan,
             'estimasi_waktu' => $this->estimateWaitMinutes($antrianDiDepan),
         ]);
     }
 
+    // =========================================================================
+    // MANAJEMEN EVENT (MULTI-EVENT & FORM BUILDER DINAMIS)
+    // =========================================================================
+
+    public function manageEvents(Request $request)
+    {
+        $query = Event::withCount(['serviceDates', 'tickets']);
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('subtitle', 'like', "%{$search}%")
+                    ->orWhere('slug', 'like', "%{$search}%");
+            });
+        }
+
+        $events = $query->orderByDesc('is_active')
+            ->orderByDesc('id')
+            ->paginate(10)
+            ->withQueryString();
+
+        return view('backend.dashboard.events', compact('events'));
+    }
+
+    public function storeEvent(Request $request)
+    {
+        $attributes = $this->validatedEventPayload($request);
+        $attributes['slug'] = $this->generateUniqueEventSlug($attributes['name']);
+
+        Event::create($attributes);
+
+        return back()->with('success', 'Event baru berhasil dibuat!');
+    }
+
+    public function updateEvent(Request $request, int $id)
+    {
+        $event = Event::findOrFail($id);
+        $event->update($this->validatedEventPayload($request));
+
+        return back()->with('success', 'Konfigurasi event berhasil diperbarui!');
+    }
+
+    private function validatedEventPayload(Request $request): array
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'subtitle' => 'nullable|string|max:255',
+            'description' => 'nullable|string|max:2000',
+            'identifier_label' => 'required|string|max:60',
+            'identifier_placeholder' => 'nullable|string|max:255',
+            'name_label' => 'required|string|max:80',
+            'confirmation_text' => 'nullable|string|max:1000',
+            'checklist_text' => 'nullable|string|max:3000',
+            'fields' => 'nullable|array',
+            'requires_checkin' => 'nullable|boolean',
+            'is_active' => 'nullable|boolean',
+        ]);
+
+        return [
+            'name' => $validated['name'],
+            'subtitle' => $validated['subtitle'] ?? null,
+            'description' => $validated['description'] ?? null,
+            'identifier_label' => $validated['identifier_label'],
+            'identifier_placeholder' => $validated['identifier_placeholder'] ?? null,
+            'name_label' => $validated['name_label'],
+            'form_fields' => Event::normalizeFields($request->input('fields', [])),
+            'checklist_items' => $this->parseChecklist($request->input('checklist_text')),
+            'confirmation_text' => $validated['confirmation_text'] ?? null,
+            'requires_checkin' => $request->boolean('requires_checkin'),
+            'is_active' => $request->boolean('is_active'),
+        ];
+    }
+
+    public function toggleEvent(int $id)
+    {
+        $event = Event::findOrFail($id);
+        $event->is_active = !$event->is_active;
+        $event->save();
+
+        return back()->with('success', 'Status event "' . $event->name . '" diubah!');
+    }
+
+    public function destroyEvent(int $id)
+    {
+        Event::findOrFail($id)->delete();
+
+        return back()->with('success', 'Event beserta sesi & tiketnya berhasil dihapus!');
+    }
+
+    private function generateUniqueEventSlug(string $name): string
+    {
+        $base = Str::slug($name) ?: 'event';
+        $slug = $base;
+        $suffix = 2;
+
+        while (Event::where('slug', $slug)->exists()) {
+            $slug = $base . '-' . $suffix;
+            $suffix++;
+        }
+
+        return $slug;
+    }
+
+    private function parseChecklist(?string $raw): array
+    {
+        if (!$raw) {
+            return [];
+        }
+
+        $lines = preg_split('/\r\n|\r|\n/', $raw) ?: [];
+
+        return array_values(array_filter(array_map('trim', $lines), fn ($line) => $line !== ''));
+    }
+
+    // =========================================================================
+    // MANAJEMEN SESI & KUOTA
+    // =========================================================================
+
     public function manageSessions(Request $request)
     {
-        $query = ServiceDate::query();
+        $query = ServiceDate::with('event');
 
+        if ($request->filled('event_id')) {
+            $query->where('event_id', $request->event_id);
+        }
         if ($request->filled('search')) {
             $query->where('session_name', 'like', '%' . $request->search . '%');
         }
@@ -139,7 +283,9 @@ class AdminController extends Controller
             ->paginate($sdPerPage, ['*'], 'sd_page')
             ->appends($request->except('sd_page'));
 
-        return view('backend.dashboard.sessions', compact('serviceDates'));
+        $events = Event::orderByDesc('is_active')->orderBy('name')->get();
+
+        return view('backend.dashboard.sessions', compact('serviceDates', 'events'));
     }
 
     public function manageUsers(Request $request)
@@ -169,7 +315,16 @@ class AdminController extends Controller
 
     public function manageDisplay()
     {
-        $setting = Setting::first() ?? new Setting();
+        $setting = Setting::firstOrCreate(['id' => 1], [
+            'running_text' => 'Selamat Datang! Silakan Pantau Nomor Antrian Anda di Layar.',
+            'video_url' => '',
+            'video_type' => 'youtube',
+            'video_volume' => 60,
+            'announcer_text' => 'Nomor antrian, {nomor}, silakan menuju ke loket {loket}',
+            'voice_engine' => 'server_id',
+            'voice_speed' => 1.00,
+            'voice_pitch' => 1.00,
+        ]);
 
         $existingVideos = [];
         if (Storage::disk('public')->exists('videos')) {
@@ -213,16 +368,22 @@ class AdminController extends Controller
 
     public function updateLiveSetting(Request $request)
     {
-        $setting = Setting::first();
+        $setting = Setting::firstOrCreate(['id' => 1], [
+            'voice_engine' => 'server_id',
+            'voice_speed' => 1.00,
+            'voice_pitch' => 1.00,
+            'video_volume' => 60,
+        ]);
 
-        if ($setting) {
-            $field = $request->field;
-            $allowed = ['video_volume', 'voice_speed', 'voice_pitch'];
+        $field = $request->field;
+        $numericFields = ['video_volume', 'voice_speed', 'voice_pitch'];
 
-            if (in_array($field, $allowed, true)) {
-                $setting->$field = $request->value;
-                $setting->save();
-            }
+        if (in_array($field, $numericFields, true)) {
+            $setting->$field = $request->value;
+            $setting->save();
+        } elseif ($field === 'voice_engine' && in_array($request->value, ['server_id', 'browser_id'], true)) {
+            $setting->voice_engine = $request->value;
+            $setting->save();
         }
 
         return response()->json(['success' => true]);
@@ -230,12 +391,17 @@ class AdminController extends Controller
 
     public function attendanceTracker(Request $request)
     {
-        $query = Ticket::with('serviceDate');
+        $query = Ticket::with(['serviceDate', 'event']);
+
+        if ($request->filled('event_id')) {
+            $query->where('event_id', $request->event_id);
+        }
 
         if ($request->filled('search')) {
             $query->where(function ($q) use ($request) {
                 $q->where('nama_cpd', 'like', '%' . $request->search . '%')
-                    ->orWhere('nisn', 'like', '%' . $request->search . '%');
+                    ->orWhere('nisn', 'like', '%' . $request->search . '%')
+                    ->orWhere('ticket_number', 'like', '%' . $request->search . '%');
             });
         }
 
@@ -258,72 +424,100 @@ class AdminController extends Controller
         }
 
         if ($request->has('export') && $request->export === 'true') {
-            $tickets = $query->orderBy('nama_cpd', 'asc')->get();
-            $filename = 'Rekap_Kehadiran_Peserta_' . date('Y-m-d_H-i') . '.csv';
-
-            $headers = [
-                'Content-type' => 'text/csv',
-                'Content-Disposition' => "attachment; filename=$filename",
-                'Pragma' => 'no-cache',
-                'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
-                'Expires' => '0',
-            ];
-
-            $columns = [
-                'ID Tiket Penuh',
-                'Nomor Antrian',
-                'Nama Lengkap',
-                'NISN',
-                'Asal Sekolah',
-                'WhatsApp',
-                'Email',
-                'Alamat Lengkap',
-                'Data Kesejahteraan',
-                'Tanggal Sesi',
-                'Waktu Sesi',
-                'Status Kehadiran',
-                'Catatan Verifikator',
-            ];
-
-            $callback = function () use ($tickets, $columns) {
-                $file = fopen('php://output', 'w');
-                fputs($file, "\xEF\xBB\xBF");
-                fputcsv($file, $columns);
-
-                foreach ($tickets as $ticket) {
-                    $sd = $ticket->serviceDate;
-                    fputcsv($file, [
-                        $ticket->ticket_number,
-                        explode('-', $ticket->ticket_number)[0],
-                        strtoupper($ticket->nama_cpd),
-                        "'" . $ticket->nisn,
-                        $ticket->asal_sekolah,
-                        "'" . $ticket->whatsapp,
-                        $ticket->email ?? '-',
-                        str_replace(["\r\n", "\n", "\r"], ' ', $ticket->alamat),
-                        strtoupper($ticket->jalur_pendaftaran),
-                        $sd ? Carbon::parse($sd->service_date)->format('Y-m-d') : '-',
-                        $sd ? Carbon::parse($sd->start_time)->format('H:i') . ' - ' . Carbon::parse($sd->end_time)->format('H:i') : '-',
-                        strtoupper(str_replace('_', ' ', $ticket->status)),
-                        $ticket->catatan_loket ?? '-',
-                    ]);
-                }
-                fclose($file);
-            };
-
-            return response()->stream($callback, 200, $headers);
+            return $this->exportAttendanceCsv($query, $request->filled('event_id') ? Event::find($request->event_id) : null);
         }
 
         $perPage = $request->per_page ?? 20;
         $tickets = $query->paginate($perPage)->withQueryString();
-        $dates = ServiceDate::orderBy('service_date', 'desc')->get();
+        $dates = ServiceDate::with('event')->orderBy('service_date', 'desc')->get();
+        $events = Event::orderByDesc('is_active')->orderBy('name')->get();
 
-        return view('backend.dashboard.attendance', compact('tickets', 'dates'));
+        return view('backend.dashboard.attendance', compact('tickets', 'dates', 'events'));
+    }
+
+    private function exportAttendanceCsv($query, ?Event $selectedEvent)
+    {
+        $tickets = $query->orderBy('nama_cpd', 'asc')->get();
+        $filename = 'Rekap_Antrian_' . date('Y-m-d_H-i') . '.csv';
+
+        $headers = [
+            'Content-type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=$filename",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        $dynamicFields = $selectedEvent ? ($selectedEvent->form_fields ?? []) : [];
+
+        $columns = [
+            'ID Tiket Penuh',
+            'Nomor Antrian',
+            'Event',
+            $selectedEvent?->identifier_label ?? 'Identitas',
+            $selectedEvent?->name_label ?? 'Nama Pendaftar',
+        ];
+
+        if ($selectedEvent) {
+            foreach ($dynamicFields as $field) {
+                $columns[] = $field['label'] ?? $field['key'];
+            }
+        } else {
+            $columns[] = 'Data Isian Form';
+        }
+
+        $columns = array_merge($columns, [
+            'Tanggal Sesi',
+            'Waktu Sesi',
+            'Status Kehadiran',
+            'Catatan Verifikator',
+        ]);
+
+        $callback = function () use ($tickets, $columns, $selectedEvent, $dynamicFields) {
+            $file = fopen('php://output', 'w');
+            fputs($file, "\xEF\xBB\xBF");
+            fputcsv($file, $columns);
+
+            foreach ($tickets as $ticket) {
+                $sd = $ticket->serviceDate;
+                $row = [
+                    $ticket->ticket_number,
+                    explode('-', $ticket->ticket_number)[0],
+                    $ticket->event?->name ?? '-',
+                    "'" . $ticket->nisn,
+                    strtoupper($ticket->nama_cpd),
+                ];
+
+                if ($selectedEvent) {
+                    foreach ($dynamicFields as $field) {
+                        $val = $ticket->fieldValue((string) ($field['key'] ?? '')) ?? '-';
+                        $row[] = str_replace(["\r\n", "\n", "\r"], ' ', $val);
+                    }
+                } else {
+                    $pairs = array_map(
+                        fn ($item) => ($item['label'] ?? '') . ': ' . str_replace(["\r\n", "\n", "\r"], ' ', (string) ($item['value'] ?? '-')),
+                        $ticket->displayDetails()
+                    );
+                    $row[] = implode(' | ', $pairs) ?: '-';
+                }
+
+                $row[] = $sd ? Carbon::parse($sd->service_date)->format('Y-m-d') : '-';
+                $row[] = $sd ? Carbon::parse($sd->start_time)->format('H:i') . ' - ' . Carbon::parse($sd->end_time)->format('H:i') : '-';
+                $row[] = strtoupper(str_replace('_', ' ', $ticket->status));
+                $row[] = $ticket->catatan_loket ?? '-';
+
+                fputcsv($file, $row);
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 
     public function storeServiceDate(Request $request)
     {
         $validated = $request->validate([
+            'event_id' => 'required|integer|exists:events,id',
             'service_date' => 'required|date',
             'session_name' => 'required|string|max:100',
             'session_code' => 'required|string|max:3',
@@ -332,14 +526,15 @@ class AdminController extends Controller
             'quota' => 'required|integer|min:1',
         ]);
 
-        $cekDuplikat = ServiceDate::where('service_date', $validated['service_date'])
+        $cekDuplikat = ServiceDate::where('event_id', $validated['event_id'])
+            ->where('service_date', $validated['service_date'])
             ->where('session_name', $validated['session_name'])
             ->first();
 
         if ($cekDuplikat) {
             $tanggalFormat = Carbon::parse($validated['service_date'])->translatedFormat('d F Y');
 
-            return redirect()->back()->with('error', 'Gagal! Sesi "' . $validated['session_name'] . '" pada ' . $tanggalFormat . ' sudah ada. Gunakan nama sesi lain (misal: Sesi 2).');
+            return redirect()->back()->with('error', 'Gagal! Sesi "' . $validated['session_name'] . '" pada ' . $tanggalFormat . ' untuk event ini sudah ada.');
         }
 
         $validated['session_code'] = strtoupper(trim($validated['session_code']));
@@ -351,6 +546,7 @@ class AdminController extends Controller
     public function updateServiceDate(Request $request, int $id)
     {
         $validated = $request->validate([
+            'event_id' => 'required|integer|exists:events,id',
             'service_date' => 'required|date',
             'session_name' => 'required|string|max:100',
             'session_code' => 'required|string|max:3',
@@ -359,7 +555,8 @@ class AdminController extends Controller
             'quota' => 'required|integer|min:1',
         ]);
 
-        $cekDuplikat = ServiceDate::where('service_date', $validated['service_date'])
+        $cekDuplikat = ServiceDate::where('event_id', $validated['event_id'])
+            ->where('service_date', $validated['service_date'])
             ->where('session_name', $validated['session_name'])
             ->where('id', '!=', $id)
             ->first();
@@ -367,7 +564,7 @@ class AdminController extends Controller
         if ($cekDuplikat) {
             $tanggalFormat = Carbon::parse($validated['service_date'])->translatedFormat('d F Y');
 
-            return redirect()->back()->with('error', 'Gagal Edit! Sesi "' . $validated['session_name'] . '" pada ' . $tanggalFormat . ' sudah ada.');
+            return redirect()->back()->with('error', 'Gagal Edit! Sesi "' . $validated['session_name'] . '" pada ' . $tanggalFormat . ' untuk event ini sudah ada.');
         }
 
         $validated['session_code'] = strtoupper(trim($validated['session_code']));
@@ -394,7 +591,7 @@ class AdminController extends Controller
 
     public function getStudentsBySession(int $id)
     {
-        $students = Ticket::where('service_date_id', $id)->orderBy('id', 'asc')->get();
+        $students = Ticket::with('event')->where('service_date_id', $id)->orderBy('id', 'asc')->get();
 
         return response()->json(['success' => true, 'data' => $students]);
     }
@@ -506,7 +703,7 @@ class AdminController extends Controller
         if ($ticket->status !== 'dipanggil') {
             $ticket->status = 'dipanggil';
             $ticket->call_count = 1;
-        } elseif ($ticket->call_count < 3) {
+        } else {
             $ticket->call_count += 1;
         }
 
@@ -514,12 +711,13 @@ class AdminController extends Controller
         $ticket->save();
 
         $setting = Setting::first();
-        $template = $setting->announcer_text ?? 'Nomor Antrian... {nomor}... Silakan menuju ke... Loket... {loket}';
+        $template = $setting->announcer_text ?? 'Nomor antrian, {nomor}, silakan menuju ke loket {loket}';
 
         return response()->json([
             'success' => true,
             'ticket_number' => explode('-', $ticket->ticket_number)[0],
             'loket_number' => Auth::user()->loket_number,
+            'call_count' => $ticket->call_count,
             'announcer_template' => $template,
         ]);
     }
@@ -532,7 +730,7 @@ class AdminController extends Controller
         $ticket->status = 'menghadap';
         $ticket->save();
 
-        return back()->with('success', 'Siswa sedang diverifikasi.');
+        return back()->with('success', 'Peserta sedang dilayani di loket.');
     }
 
     public function lewatiTiket(Request $request)
@@ -558,7 +756,7 @@ class AdminController extends Controller
         $ticket->catatan_loket = $request->catatan_loket;
         $ticket->save();
 
-        return back()->with('success', 'Verifikasi selesai!');
+        return back()->with('success', 'Pelayanan selesai!');
     }
 
     public function restoreTiket(Request $request)
@@ -573,7 +771,7 @@ class AdminController extends Controller
             $ticket->catatan_loket = null;
             $ticket->save();
 
-            return back()->with('success', 'Siswa dikembalikan ke antrian.');
+            return back()->with('success', 'Peserta dikembalikan ke antrian.');
         }
 
         return back()->with('error', 'Gagal memulihkan tiket.');
@@ -586,10 +784,7 @@ class AdminController extends Controller
             return response()->json(['success' => false]);
         }
 
-        $antrianDiDepan = Ticket::where('service_date_id', $ticket->service_date_id)
-            ->where('status', 'hadir_di_lokasi')
-            ->where('updated_at', '<', $ticket->updated_at ?? now())
-            ->count();
+        $antrianDiDepan = $this->countAheadInQueue($ticket);
 
         return response()->json([
             'success' => true,
@@ -603,10 +798,21 @@ class AdminController extends Controller
     public function cariNisn(Request $request)
     {
         $request->validate(['nisn' => 'required|string']);
+        $input = trim($request->nisn);
 
-        $ticket = Ticket::with('serviceDate')->where('nisn', $request->nisn)->first();
+        $ticket = Ticket::with(['serviceDate', 'event'])
+            ->where('ticket_number', $input)
+            ->first();
+
+        if (!$ticket) {
+            $ticket = Ticket::with(['serviceDate', 'event'])
+                ->where('nisn', $input)
+                ->orderBy('id', 'desc')
+                ->first();
+        }
+
         if (!$ticket || !$ticket->serviceDate) {
-            return response()->json(['success' => false, 'message' => 'NISN tidak terdaftar di sistem.']);
+            return response()->json(['success' => false, 'message' => 'Data identitas / nomor tiket tidak terdaftar di sistem.']);
         }
 
         $isSelesaiWithNote = ($ticket->status === 'selesai' && !empty($ticket->catatan_loket));
@@ -616,14 +822,14 @@ class AdminController extends Controller
             $statusMap = [
                 'hadir_di_lokasi' => 'HADIR DI LOKASI',
                 'dipanggil' => 'SEDANG DIPANGGIL',
-                'menghadap' => 'SEDANG VERIFIKASI',
+                'menghadap' => 'SEDANG DILAYANI',
                 'selesai' => 'SELESAI (FINAL)',
             ];
             $statusName = $statusMap[$ticket->status] ?? strtoupper($ticket->status);
 
             return response()->json([
                 'success' => false,
-                'message' => "<div class='text-left'><b class='text-red-600 text-lg'>MUTASI DITOLAK!</b><br><br>Status siswa ini adalah <b class='text-blue-600'>{$statusName}</b> tanpa PR/Catatan.<br><br>Mutasi <b>HANYA</b> diizinkan untuk siswa: <br>- <i>Belum Hadir</i><br>- <i>Terlewat</i><br>- <i>Selesai dengan Catatan (PR Berkas)</i>.</div>",
+                'message' => "<div class='text-left'><b class='text-red-600 text-lg'>MUTASI DITOLAK!</b><br><br>Status peserta ini adalah <b class='text-blue-600'>{$statusName}</b> tanpa PR/Catatan.<br><br>Mutasi <b>HANYA</b> diizinkan untuk peserta: <br>- <i>Belum Hadir</i><br>- <i>Terlewat</i><br>- <i>Selesai dengan Catatan</i>.</div>",
             ]);
         }
 
@@ -631,9 +837,13 @@ class AdminController extends Controller
         $ticketDate = Carbon::parse($ticket->serviceDate->service_date)->format('Y-m-d');
 
         if ($ticketDate === $todayAbsolute && !$isSelesaiWithNote) {
+            $todayHint = $ticket->event?->requires_checkin
+                ? 'Silakan arahkan ke Pos Scanner untuk Check-In agar masuk ke antrian.'
+                : 'Event ini langsung masuk antrian loket tanpa Check-In (gunakan Kembalikan ke Antrian di Loket jika berstatus Dilewati).';
+
             return response()->json([
                 'success' => false,
-                'message' => "<div class='text-left'>Jadwal siswa ini adalah <b class='text-blue-600'>HARI INI</b>. Tidak perlu dimutasi!<br><br>Silakan arahkan siswa ke Pos OSIS untuk Scan QR Code agar masuk ke antrian.</div>",
+                'message' => "<div class='text-left'>Jadwal peserta ini adalah <b class='text-blue-600'>HARI INI</b>. Tidak perlu dimutasi!<br><br>{$todayHint}</div>",
             ]);
         }
 
@@ -642,12 +852,13 @@ class AdminController extends Controller
             : (($ticketDate < $todayAbsolute) ? 'KADALUARSA (Terlewat)' : 'KEPAGIAN (Maju / Awal)');
 
         $formattedDate = Carbon::parse($ticket->serviceDate->service_date)->format('d F Y');
-        $todaySession = $this->findTodayActiveSession();
+        $todaySession = $this->findTodayActiveSession($ticket->event_id);
         $isFull = $todaySession && $todaySession->booked_count >= $todaySession->quota;
 
         return response()->json([
             'success' => true,
             'data' => $ticket,
+            'event_name' => $ticket->event?->name ?? 'Antrian',
             'session_date' => $formattedDate,
             'status_jadwal' => $statusJadwal,
             'is_today_full' => $isFull,
@@ -670,9 +881,9 @@ class AdminController extends Controller
             return response()->json(['success' => false, 'message' => 'Gagal! Status tiket ini tidak memenuhi syarat untuk dimutasi.']);
         }
 
-        $todaySession = $this->findTodayActiveSession();
+        $todaySession = $this->findTodayActiveSession($ticket->event_id);
         if (!$todaySession) {
-            return response()->json(['success' => false, 'message' => 'Gagal Mutasi: Belum ada Sesi Layanan yang dibuka untuk hari ini.']);
+            return response()->json(['success' => false, 'message' => 'Gagal Mutasi: Belum ada Sesi Layanan hari ini untuk event tiket tersebut.']);
         }
 
         $oldSessionId = $ticket->service_date_id;
@@ -687,11 +898,11 @@ class AdminController extends Controller
 
                 return response()->json([
                     'success' => true,
-                    'message' => "Berhasil! Siswa dimasukkan kembali ke antrian hari ini dengan Nomor Antrian: $shortNumber. (Catatan PR tetap tersimpan)",
+                    'message' => "Berhasil! Peserta dimasukkan kembali ke antrian hari ini dengan Nomor Antrian: $shortNumber. (Catatan tetap tersimpan)",
                 ]);
             }
 
-            return response()->json(['success' => false, 'message' => 'Siswa ini sudah berada di antrian hari ini.']);
+            return response()->json(['success' => false, 'message' => 'Peserta ini sudah berada di antrian hari ini.']);
         }
 
         $generated = DB::transaction(function () use ($ticket, $oldSessionId, $todaySession) {
@@ -717,7 +928,7 @@ class AdminController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Berhasil! Kuota lama dikembalikan, dan siswa masuk ke antrian hari ini dengan nomor: ' . $generated->short,
+            'message' => 'Berhasil! Kuota lama dikembalikan, dan peserta masuk ke antrian hari ini dengan nomor: ' . $generated->short,
         ]);
     }
 
@@ -762,36 +973,36 @@ class AdminController extends Controller
 
     public function storeGoShow(Request $request)
     {
-        $validated = $request->validate([
-            'nisn' => 'required|numeric|unique:tickets,nisn',
-            'nama_cpd' => 'required|string|max:255',
-            'asal_sekolah' => 'required|string|max:255',
-            'whatsapp' => 'required|string|max:20',
-            'email' => 'required|email',
-            'alamat' => 'required|string',
-            'jalur_pendaftaran' => 'required|in:KIP,DTKS,KIP & DTKS,REGULER',
-        ], ['nisn.unique' => 'NISN ini sudah terdaftar di sistem online/offline. Siswa tidak boleh mendaftar ganda.']);
+        $event = Event::where('is_active', true)->findOrFail($request->input('event_id'));
 
-        $todaySession = $this->findTodayActiveSession();
+        $payload = $this->validateEventSubmission(
+            $event,
+            $request,
+            ($event->identifier_label ?: 'Identitas') . ' ini sudah terdaftar pada event ' . $event->name . '. Peserta tidak boleh mendaftar ganda.'
+        );
+
+        $todaySession = $this->findTodayActiveSession($event->id);
         if (!$todaySession) {
             return response()->json([
                 'success' => false,
-                'message' => 'GAGAL: Belum ada Sesi Layanan yang dibuka untuk HARI INI. Silakan Super Admin membuka sesi terlebih dahulu di menu Manajemen Sesi.',
+                'message' => 'GAGAL: Belum ada Sesi Layanan HARI INI untuk event "' . $event->name . '". Silakan Super Admin membuka sesi terlebih dahulu di Manajemen Sesi.',
             ]);
         }
 
-        [$ticket, $shortNumber] = DB::transaction(function () use ($validated, $todaySession) {
+        [$ticket, $shortNumber] = DB::transaction(function () use ($event, $payload, $todaySession) {
             $generated = $this->generateSequenceNumber('GS');
 
             $created = Ticket::create([
+                'event_id' => $event->id,
                 'ticket_number' => $generated->full,
-                'nisn' => $validated['nisn'],
-                'nama_cpd' => $validated['nama_cpd'],
-                'asal_sekolah' => $validated['asal_sekolah'],
-                'whatsapp' => $validated['whatsapp'],
-                'email' => $validated['email'],
-                'alamat' => $validated['alamat'],
-                'jalur_pendaftaran' => $validated['jalur_pendaftaran'],
+                'nisn' => $payload['nisn'],
+                'nama_cpd' => $payload['nama_cpd'],
+                'asal_sekolah' => $payload['asal_sekolah'],
+                'whatsapp' => $payload['whatsapp'],
+                'email' => $payload['email'],
+                'alamat' => $payload['alamat'],
+                'jalur_pendaftaran' => $payload['jalur_pendaftaran'],
+                'form_data' => $payload['form_data'],
                 'service_date_id' => $todaySession->id,
                 'status' => 'hadir_di_lokasi',
                 'qr_code_path' => null,
@@ -804,30 +1015,49 @@ class AdminController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Tiket Go-Show Berhasil Dibuat & Siswa Langsung Masuk Antrian!',
+            'message' => 'Tiket Go-Show Berhasil Dibuat & Peserta Langsung Masuk Antrian!',
+            'event_name' => $event->name,
             'ticket_number' => $shortNumber,
             'nama_cpd' => strtoupper($ticket->nama_cpd),
         ]);
     }
 
+    public function backupDatabase(DatabaseBackupService $backupService)
+    {
+        $filename = 'disapa_backup_' . Carbon::now('Asia/Jakarta')->format('Y-m-d_His') . '.sql';
+
+        return response()->streamDownload(function () use ($backupService) {
+            $out = fopen('php://output', 'wb');
+            if ($out === false) {
+                return;
+            }
+            $backupService->streamSqlDump($out);
+            fclose($out);
+        }, $filename, [
+            'Content-Type' => 'application/sql; charset=UTF-8',
+        ]);
+    }
+
     /**
-     * Cari sesi aktif hari ini yang sedang berlangsung atau sesi terakhir hari ini.
+     * Cari sesi aktif hari ini untuk event tertentu.
      */
-    private function findTodayActiveSession(): ?ServiceDate
+    private function findTodayActiveSession(?int $eventId = null): ?ServiceDate
     {
         $now = Carbon::now('Asia/Jakarta');
         $currentTime = $now->format('H:i:s');
         $todayAbsolute = $now->toDateString();
 
-        $session = ServiceDate::where('is_active', true)
-            ->whereDate('service_date', $todayAbsolute)
+        $baseQuery = ServiceDate::where('is_active', true)
+            ->when($eventId, fn ($q) => $q->where('event_id', $eventId))
+            ->whereDate('service_date', $todayAbsolute);
+
+        $session = (clone $baseQuery)
             ->whereTime('end_time', '>=', $currentTime)
             ->orderBy('start_time', 'asc')
             ->first();
 
         if (!$session) {
-            $session = ServiceDate::where('is_active', true)
-                ->whereDate('service_date', $todayAbsolute)
+            $session = (clone $baseQuery)
                 ->orderBy('start_time', 'desc')
                 ->first();
         }

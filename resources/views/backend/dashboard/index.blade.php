@@ -7,7 +7,7 @@
         <div class="relative z-10 flex flex-col md:flex-row items-center gap-4">
             <div>
                 <h1 class="text-2xl font-black text-gray-800 text-left flex items-center gap-2">
-                    <i class="fa-solid fa-users text-blue-600"></i> Dashboard Verifikator
+                    <i class="fa-solid fa-users text-blue-600"></i> Dashboard Loket
                 </h1>
                 <p class="text-sm text-gray-500 mt-1">Login sebagai: <span class="font-bold text-blue-600">{{ Auth::user()->name }}</span> (Loket {{ Auth::user()->loket_number }})</p>
             </div>
@@ -33,7 +33,7 @@
                 </button>
             @endif
 
-            <form id="logoutForm" action="{{ route('logout') }}" method="POST" class="swal-form m-0" data-msg="Anda akan keluar dari pos meja loket/verifikasi.">
+            <form id="logoutForm" action="{{ route('logout') }}" method="POST" class="swal-form m-0" data-msg="Anda akan keluar dari pos meja loket.">
                 @csrf
                 <button type="submit" class="bg-red-600 text-white px-4 py-2.5 rounded-xl font-bold hover:bg-red-700 transition text-sm shadow-sm flex items-center gap-2 whitespace-nowrap">
                     <i class="fa-solid fa-power-off"></i> Logout
@@ -75,17 +75,27 @@
                     <thead>
                         <tr class="bg-gray-100 text-gray-600 uppercase text-[11px] tracking-wider border-b-2 border-gray-200">
                             <th class="p-4 font-black rounded-tl-xl w-20 text-center">No</th>
-                            <th class="p-4 font-black">NISN</th>
+                            <th class="p-4 font-black">Event & Identitas</th>
                             <th class="p-4 font-black">Nama Pendaftar</th>
-                            <th class="p-4 font-black text-center rounded-tr-xl w-36">Aksi</th>
+                            <th class="p-4 font-black text-center rounded-tr-xl w-44">Aksi</th>
                         </tr>
                     </thead>
                     <tbody id="antrianBody">
                         @forelse($antrianHadir as $item)
                         <tr class="hover:bg-blue-50 border-b transition">
                             <td class="p-4 text-center font-black text-xl text-blue-600">{{ explode('-', $item->ticket_number)[0] }}</td>
-                            <td class="p-4 font-mono font-bold text-gray-600 tracking-wider">{{ $item->nisn }}</td>
-                            <td class="p-4 font-bold text-gray-800">{{ $item->nama_cpd }}</td>
+                            <td class="p-4">
+                                @if($item->event)
+                                <span class="inline-block mb-1 px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">{{ $item->event->name }}</span>
+                                @endif
+                                <div class="font-mono font-bold text-gray-600 tracking-wider text-xs">{{ $item->nisn }}</div>
+                            </td>
+                            <td class="p-4">
+                                <div class="font-bold text-gray-800">{{ $item->nama_cpd }}</div>
+                                <button type="button" onclick="lihatDetailPendaftar(this)" data-detail="{{ json_encode($item->detailPayload()) }}" class="mt-1 text-[11px] text-blue-600 hover:underline font-bold">
+                                    <i class="fa-solid fa-circle-info mr-1"></i>Lihat Detail Isian
+                                </button>
+                            </td>
                             <td class="p-4 text-center">
                                 <button onclick="panggilTiket({{ $item->id }})" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg shadow-md transition flex items-center justify-center gap-2">
                                     <i class="fa-solid fa-microphone"></i> Panggil
@@ -97,7 +107,7 @@
                             <td colspan="4" class="p-12 text-center text-gray-400">
                                 <div class="flex flex-col items-center justify-center">
                                     <i class="fa-solid fa-satellite-dish text-5xl mb-4 opacity-50 animate-pulse"></i>
-                                    <span class="font-bold text-sm">Belum ada siswa yang Check-In di depan.</span>
+                                    <span class="font-bold text-sm">Belum ada peserta dalam antrian panggil.</span>
                                 </div>
                             </td>
                         </tr>
@@ -115,13 +125,32 @@
                 <li class="p-4 bg-gray-50 rounded-xl border transition-all {{ $riwayat->status == 'dipanggil' ? 'border-yellow-400 bg-yellow-50 shadow-md' : ($riwayat->status == 'menghadap' ? 'border-blue-400 bg-blue-50 shadow-md' : 'border-gray-200') }}">
                     <div class="flex justify-between items-center mb-3 border-b border-gray-200 pb-2">
                         <div>
+                            @if($riwayat->event)
+                            <span class="inline-block px-2 py-0.5 mb-1 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">{{ $riwayat->event->name }}</span>
+                            @endif
                             <div class="font-black text-xl {{ $riwayat->status == 'dipanggil' ? 'text-yellow-700' : 'text-gray-800' }}">{{ explode('-', $riwayat->ticket_number)[0] }}</div>
                             <div class="text-sm font-bold text-gray-600">{{ $riwayat->nama_cpd }}</div>
+                            <button type="button" onclick="lihatDetailPendaftar(this)" data-detail="{{ json_encode($riwayat->detailPayload()) }}" class="mt-0.5 text-[11px] text-blue-600 hover:underline font-bold">
+                                <i class="fa-solid fa-circle-info mr-1"></i>Detail
+                            </button>
                         </div>
-                        @if($riwayat->status == 'dipanggil') <span class="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded font-bold animate-pulse shadow-sm">Menunggu ({{ $riwayat->call_count }}/3)</span>
-                        @elseif($riwayat->status == 'menghadap') <span class="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded font-bold shadow-sm">Verifikasi Berkas</span>
-                        @elseif($riwayat->status == 'selesai') <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold"><i class="fa-solid fa-check"></i> Selesai</span>
-                        @else <span class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-bold"><i class="fa-solid fa-xmark"></i> Dilewati</span> @endif
+                        <div class="text-right">
+                            @if($riwayat->status == 'dipanggil')
+                                <span class="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded font-bold animate-pulse shadow-sm inline-block">Dipanggil ({{ $riwayat->call_count }}x)</span>
+                            @elseif($riwayat->status == 'menghadap')
+                                <span class="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded font-bold shadow-sm inline-block">Sedang Dilayani</span>
+                            @elseif($riwayat->status == 'selesai')
+                                <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold inline-block"><i class="fa-solid fa-check"></i> Selesai</span>
+                            @else
+                                <span class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-bold inline-block"><i class="fa-solid fa-xmark"></i> Dilewati</span>
+                            @endif
+
+                            @if((int) $riwayat->call_count > 0)
+                                <div class="text-[11px] font-bold text-slate-600 mt-1">
+                                    <i class="fa-solid fa-bullhorn text-amber-500 mr-1"></i>Diklik: <span class="font-black text-slate-800">{{ (int) $riwayat->call_count }} kali</span>
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
                     @if($riwayat->status == 'selesai' && $riwayat->catatan_loket)
@@ -132,8 +161,9 @@
 
                     @if($riwayat->status == 'dipanggil')
                         <div class="flex gap-2 mb-2">
-                            @if($riwayat->call_count < 3) <button onclick="panggilTiket({{ $riwayat->id }})" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-bold py-2 rounded-lg transition"><i class="fa-solid fa-bullhorn"></i> Ulang</button>
-                            @else <button disabled class="flex-1 bg-gray-300 text-gray-500 text-xs font-bold py-2 rounded-lg cursor-not-allowed"><i class="fa-solid fa-microphone-slash"></i> Max Panggilan</button> @endif
+                            <button onclick="panggilTiket({{ $riwayat->id }})" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-bold py-2 rounded-lg transition">
+                                <i class="fa-solid fa-bullhorn"></i> Ulang ({{ (int) $riwayat->call_count }}x)
+                            </button>
                             <form action="{{ route('admin.menghadap') }}" method="POST" class="flex-1">@csrf <input type="hidden" name="ticket_id" value="{{ $riwayat->id }}"><button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 rounded-lg transition"><i class="fa-solid fa-user-check"></i> Menghadap</button></form>
                         </div>
                         <form action="{{ route('admin.lewati') }}" method="POST" class="swal-form" data-msg="Yakin ingin melewati siswa ini? Siswa tidak akan dilayani.">@csrf <input type="hidden" name="ticket_id" value="{{ $riwayat->id }}"><button type="submit" class="w-full bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold py-2 rounded-lg transition"><i class="fa-solid fa-forward-step"></i> Lewati / Tidak Hadir</button></form>
@@ -155,7 +185,7 @@
     <div class="bg-white p-8 rounded-2xl text-center shadow-2xl border-t-4 border-blue-600">
         <div class="text-blue-600 text-6xl mb-4 animate-bounce"><i class="fa-solid fa-satellite-dish"></i></div>
         <h3 class="text-2xl font-black mb-2 text-gray-800">Mengirim Sinyal...</h3>
-        <p class="text-gray-500 text-sm font-medium">Layar Aula akan segera memanggil siswa.</p>
+        <p class="text-gray-500 text-sm font-medium">Layar Aula akan segera memanggil peserta.</p>
     </div>
 </div>
 @endsection
@@ -309,14 +339,49 @@
         }
     }
 
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, function(ch) {
+            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+        });
+    }
+
+    function lihatDetailPendaftar(btn) {
+        isActionActive = true;
+        const info = JSON.parse(btn.dataset.detail || '{}');
+        const details = Array.isArray(info.details) ? info.details : [];
+        const detailRows = details.map((item) =>
+            `<div class="flex justify-between gap-4 border-b border-gray-100 py-1.5 text-xs">
+                <span class="text-gray-500 font-semibold">${escapeHtml(item.label || item.key || '-')}</span>
+                <span class="text-gray-800 font-bold text-right">${escapeHtml(item.value ?? '-')}</span>
+            </div>`
+        ).join('') || '<div class="text-xs text-gray-400 italic py-2">Tidak ada data tambahan.</div>';
+
+        Swal.fire({
+            title: escapeHtml(info.name || 'Detail Pendaftar'),
+            html: `<div class="text-left bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-1.5">
+                <div class="flex justify-between gap-4 border-b border-gray-200 pb-2 mb-1 text-xs">
+                    <span class="text-indigo-700 font-black">${escapeHtml(info.event)}</span>
+                    <span class="font-mono font-black text-blue-700">${escapeHtml(info.ticket)}</span>
+                </div>
+                <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5 text-xs">
+                    <span class="text-gray-500 font-semibold">${escapeHtml(info.identifier_label || 'Identitas')}</span>
+                    <span class="text-gray-800 font-mono font-bold">${escapeHtml(info.identifier)}</span>
+                </div>
+                ${detailRows}
+            </div>`,
+            confirmButtonText: 'Tutup',
+            confirmButtonColor: '#2563eb'
+        }).then(() => { isActionActive = false; });
+    }
+
     function bukaMutasi() {
         isActionActive = true;
         Swal.fire({
-            title: 'Mutasi Siswa', text: "Masukkan NISN Siswa yang tertinggal/maju jadwal:", input: 'number', inputAttributes: { placeholder: 'Ketik NISN di sini...' },
+            title: 'Mutasi Jadwal Peserta', text: "Masukkan Identitas (NISN/NIK) atau Nomor Tiket peserta:", input: 'text', inputAttributes: { placeholder: 'Ketik Identitas atau No. Tiket...' },
             showCancelButton: true, confirmButtonText: '<i class="fa-solid fa-search"></i> Cari Data', cancelButtonText: 'Batal', confirmButtonColor: '#2563eb', showLoaderOnConfirm: true,
             preConfirm: (nisn) => {
-                if (!nisn) { Swal.showValidationMessage('NISN tidak boleh kosong!'); return false; }
-                return fetch(`{{ route('admin.cari_nisn') }}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ nisn: nisn }) })
+                if (!nisn || !nisn.trim()) { Swal.showValidationMessage('Identitas / No. Tiket tidak boleh kosong!'); return false; }
+                return fetch(`{{ route('admin.cari_nisn') }}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ nisn: nisn.trim() }) })
                     .then(response => response.json()).catch(error => { Swal.showValidationMessage(`Request failed: ${error}`); });
             }, allowOutsideClick: () => !Swal.isLoading()
         }).then((result) => {
@@ -325,7 +390,7 @@
                     let s = result.value.data;
                     let warningHtml = result.value.is_today_full ? `<div class="bg-red-100 border border-red-400 text-red-700 p-3 rounded-lg mt-3 text-xs font-black animate-pulse">PERHATIAN: Kuota Hari Ini sudah PENUH.</div>` : '';
                     Swal.fire({
-                        title: 'Data Ditemukan!', html: `<div class="text-left text-sm space-y-2 bg-gray-50 p-4 rounded-lg border mt-2 mb-2 shadow-inner"><p><b>NISN:</b> ${s.nisn}</p><p><b>Nama:</b> ${s.nama_cpd}</p><p><b>Status Jadwal:</b> <span class="text-red-600 font-black">${result.value.status_jadwal}</span></p></div>${warningHtml}`, icon: 'info',
+                        title: 'Data Ditemukan!', html: `<div class="text-left text-sm space-y-2 bg-gray-50 p-4 rounded-lg border mt-2 mb-2 shadow-inner"><p><b>Event:</b> <span class="text-indigo-700 font-bold">${escapeHtml(result.value.event_name || '-')}</span></p><p><b>Identitas:</b> ${escapeHtml(s.nisn)}</p><p><b>Nama:</b> ${escapeHtml(s.nama_cpd)}</p><p><b>Status Jadwal:</b> <span class="text-red-600 font-black">${escapeHtml(result.value.status_jadwal)}</span></p></div>${warningHtml}`, icon: 'info',
                         showCancelButton: true, confirmButtonColor: '#10b981', cancelButtonColor: '#6b7280', confirmButtonText: 'Proses Mutasi', cancelButtonText: 'Batal'
                     }).then((mRes) => {
                         if (mRes.isConfirmed) {

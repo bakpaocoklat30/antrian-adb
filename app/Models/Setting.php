@@ -13,6 +13,7 @@ class Setting extends Model
         'video_type',
         'video_volume',
         'announcer_text',
+        'voice_engine',
         'voice_speed',
         'voice_pitch',
         'spmb_open_at',

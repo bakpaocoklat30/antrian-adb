@@ -189,6 +189,14 @@ fi
 info "Membersihkan cache lama sebelum migrasi..."
 $DOCKER exec disapa_app php artisan optimize:clear
 
+chmod +x "$SCRIPT_DIR/backup-db.sh" "$SCRIPT_DIR/restore-db.sh"
+
+USER_COUNT="$($DOCKER exec disapa_app php -r "require 'vendor/autoload.php'; \$app = require 'bootstrap/app.php'; \$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); try { echo App\Models\User::count(); } catch (Throwable \$e) { echo 0; }" 2>/dev/null || echo 0)"
+if [ "${USER_COUNT:-0}" -gt 0 ]; then
+    info "Data database terdeteksi (${USER_COUNT} user). Membuat backup pengaman sebelum migrasi..."
+    "$SCRIPT_DIR/backup-db.sh" || warn "Backup pra-migrasi dilewati."
+fi
+
 info "Menjalankan migrasi database..."
 $DOCKER exec disapa_app php artisan migrate --force --no-interaction
 
@@ -196,8 +204,16 @@ USER_COUNT="$($DOCKER exec disapa_app php -r "require 'vendor/autoload.php'; \$a
 if [ "${USER_COUNT:-0}" = "0" ]; then
     info "Tabel users kosong, menjalankan seeder akun awal..."
     $DOCKER exec disapa_app php artisan db:seed --force --no-interaction
+    "$SCRIPT_DIR/backup-db.sh" || warn "Backup awal gagal dibuat."
 else
     ok "Tabel users sudah berisi ${USER_COUNT} akun, melewati seeder awal."
+fi
+
+if [ -d /etc/cron.d ]; then
+    info "Menjadwalkan backup database otomatis setiap hari pukul 02:00 WIB..."
+    printf "0 2 * * * root %s/backup-db.sh >> %s/backup_db/cron.log 2>&1\n" "$SCRIPT_DIR" "$SCRIPT_DIR" | $SUDO tee /etc/cron.d/disapa-db-backup >/dev/null
+    $SUDO chmod 644 /etc/cron.d/disapa-db-backup
+    ok "Cron backup harian aktif di /etc/cron.d/disapa-db-backup."
 fi
 
 $DOCKER exec disapa_app php artisan storage:link --no-interaction >/dev/null 2>&1 || true
@@ -232,4 +248,8 @@ echo " - Port MySQL (3306), phpMyAdmin (${PMA_PORT}), & Redis (6379) dikunci ke 
 echo " - Untuk akses phpMyAdmin dari laptop, gunakan SSH tunnel:"
 echo "     ssh -L ${PMA_PORT}:127.0.0.1:${PMA_PORT} user@${SERVER_IP}"
 echo "   lalu buka http://localhost:${PMA_PORT} di browser Anda."
+echo " Backup & Restore Database:"
+echo " - Backup manual  : ./backup-db.sh (hasil tersimpan di ./backup_db/*.sql.gz)"
+echo " - Restore manual : ./restore-db.sh backup_db/latest.sql.gz"
+echo " - Download cepat : Portal Super Admin -> Backup Database (.sql)"
 echo "=============================================================================="

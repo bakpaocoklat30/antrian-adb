@@ -29,6 +29,8 @@
             $isLocked = true;
         }
     }
+
+    $activeEventCount = \App\Models\Event::where('is_active', true)->count();
 @endphp
 
 @if($isLocked)
@@ -74,7 +76,7 @@
             </div>
         @else
             <p class="text-lg md:text-xl font-bold text-gray-600 mb-10 max-w-xl mx-auto leading-relaxed">
-                Tiket Antrian verifikasi berkas di SMK Negeri 1 Adiwerna akan segera dibuka dalam waktu:
+                Pendaftaran antrian {{ $event?->name ?? 'pelayanan' }} akan segera dibuka dalam waktu:
             </p>
         @endif
 
@@ -151,12 +153,28 @@
 <div class="max-w-4xl mx-auto w-full mb-20">
     <div class="bg-white p-8 md:p-12 rounded-3xl shadow-xl border border-gray-100 relative overflow-hidden">
 
+        @if($activeEventCount > 1)
+            <div class="mb-6">
+                <a href="{{ route('ticket.create') }}" class="inline-flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-800 transition">
+                    <i class="fa-solid fa-arrow-left"></i> Pilih Event Lain
+                </a>
+            </div>
+        @endif
+
         <div class="text-center mb-10">
-            <img src="{{ asset('images/logo-adb.jpg') }}" alt="Logo SMK" class="w-24 h-24 mx-auto mb-5 object-contain drop-shadow-sm rounded-full">
+            <img src="{{ asset('images/logo-adb.jpg') }}" alt="Logo" class="w-24 h-24 mx-auto mb-5 object-contain drop-shadow-sm rounded-full">
+            <span class="inline-block px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-black uppercase tracking-widest mb-3">
+                Pendaftaran Antrian
+            </span>
             <h1 class="text-3xl md:text-4xl font-black text-gray-800 tracking-tight mb-2">
-                Pendaftaran Antrian <span class="text-red-600">SPMB</span>
+                {{ $event->name }}
             </h1>
-            <h2 class="text-xl md:text-2xl font-bold text-gray-500">SMK Negeri 1 Adiwerna</h2>
+            @if($event->subtitle)
+                <h2 class="text-xl md:text-2xl font-bold text-gray-500">{{ $event->subtitle }}</h2>
+            @endif
+            @if($event->description)
+                <p class="text-sm text-gray-500 max-w-2xl mx-auto mt-3">{{ $event->description }}</p>
+            @endif
             <div class="w-20 h-1.5 bg-blue-600 mx-auto mt-6 rounded-full opacity-80"></div>
         </div>
 
@@ -178,57 +196,73 @@
 
         <form id="ticketForm" action="{{ route('ticket.store') }}" method="POST" class="space-y-6">
             @csrf
+            <input type="hidden" name="event_id" value="{{ $event->id }}">
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2"><i class="fa-solid fa-id-card text-blue-500 mr-1"></i> NISN</label>
-                    <input type="number" name="nisn" required value="{{ old('nisn') }}" placeholder="Ketik 10 Digit NISN..." class="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition font-mono font-bold text-gray-800">
+                    <label class="block text-sm font-bold text-gray-700 mb-2">
+                        <i class="fa-solid fa-id-card text-blue-500 mr-1"></i> {{ $event->identifier_label }} <span class="text-red-500">*</span>
+                    </label>
+                    <input type="text" name="nisn" required value="{{ old('nisn') }}" placeholder="{{ $event->identifier_placeholder ?: 'Masukkan ' . $event->identifier_label . '...' }}" class="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition font-mono font-bold text-gray-800">
                 </div>
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2"><i class="fa-solid fa-user text-blue-500 mr-1"></i> Nama Lengkap (Sesuai Ijazah)</label>
-                    <input type="text" name="nama_cpd" required value="{{ old('nama_cpd') }}" placeholder="Ketik Nama Lengkap..." class="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition uppercase font-bold text-gray-800">
-                </div>
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2"><i class="fa-solid fa-school text-blue-500 mr-1"></i> Asal Sekolah (SMP/MTs)</label>
-                    <input type="text" name="asal_sekolah" required value="{{ old('asal_sekolah') }}" placeholder="Contoh: SMPN 1 Adiwerna..." class="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition font-bold text-gray-800">
+                    <label class="block text-sm font-bold text-gray-700 mb-2">
+                        <i class="fa-solid fa-user text-blue-500 mr-1"></i> {{ $event->name_label }} <span class="text-red-500">*</span>
+                    </label>
+                    <input type="text" name="nama_cpd" required value="{{ old('nama_cpd') }}" placeholder="Ketik {{ $event->name_label }}..." class="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition uppercase font-bold text-gray-800">
                 </div>
 
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2"><i class="fa-solid fa-hand-holding-heart text-blue-500 mr-1"></i> Data Kesejahteraan (Opsional)</label>
-                    <div class="flex flex-wrap gap-4 p-3.5 bg-gray-50 border border-gray-300 rounded-xl items-center min-h-[54px]">
-                        <label class="flex items-center gap-2 cursor-pointer font-bold text-gray-800 hover:text-blue-600 transition">
-                            <input type="checkbox" id="check_kip" class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer">
-                            Punya KIP
+                @foreach($event->form_fields ?? [] as $field)
+                    @php
+                        $key = $field['key'] ?? '';
+                        $label = $field['label'] ?? $key;
+                        $type = $field['type'] ?? 'text';
+                        $isRequired = !empty($field['required']);
+                        $placeholder = $field['placeholder'] ?? '';
+                        $options = $field['options'] ?? [];
+                        $oldValue = old("fields.$key");
+                        $isFullWidth = in_array($type, ['textarea', 'checkbox'], true);
+                    @endphp
+                    <div class="{{ $isFullWidth ? 'md:col-span-2' : '' }}">
+                        <label class="block text-sm font-bold text-gray-700 mb-2">
+                            {{ $label }}
+                            @if($isRequired)<span class="text-red-500">*</span>@else <span class="text-xs text-gray-400 font-normal">(Opsional)</span>@endif
                         </label>
-                        <label class="flex items-center gap-2 cursor-pointer font-bold text-gray-800 hover:text-blue-600 transition">
-                            <input type="checkbox" id="check_dtks" class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer">
-                            Punya DTKS
-                        </label>
+
+                        @if($type === 'textarea')
+                            <textarea name="fields[{{ $key }}]" rows="3" {{ $isRequired ? 'required' : '' }} placeholder="{{ $placeholder }}" class="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition font-bold text-gray-800">{{ $oldValue }}</textarea>
+                        @elseif($type === 'select')
+                            <select name="fields[{{ $key }}]" {{ $isRequired ? 'required' : '' }} class="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition font-bold text-gray-800 cursor-pointer">
+                                <option value="">-- Pilih {{ $label }} --</option>
+                                @foreach($options as $opt)
+                                    <option value="{{ $opt }}" {{ $oldValue === $opt ? 'selected' : '' }}>{{ $opt }}</option>
+                                @endforeach
+                            </select>
+                        @elseif($type === 'checkbox')
+                            @php $oldArr = is_array($oldValue) ? $oldValue : []; @endphp
+                            <div class="flex flex-wrap gap-4 p-3.5 bg-gray-50 border border-gray-300 rounded-xl items-center min-h-[54px]" @if($isRequired) data-required-checkbox-group="{{ $label }}" @endif>
+                                @foreach($options as $opt)
+                                    <label class="flex items-center gap-2 cursor-pointer font-bold text-gray-800 hover:text-blue-600 transition">
+                                        <input type="checkbox" name="fields[{{ $key }}][]" value="{{ $opt }}" {{ in_array($opt, $oldArr, true) ? 'checked' : '' }} class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer">
+                                        {{ $opt }}
+                                    </label>
+                                @endforeach
+                            </div>
+                        @else
+                            <input type="{{ $type }}" name="fields[{{ $key }}]" value="{{ $oldValue }}" {{ $isRequired ? 'required' : '' }} placeholder="{{ $placeholder }}" class="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition font-bold text-gray-800">
+                        @endif
                     </div>
-                    <input type="hidden" name="jalur_pendaftaran" id="hidden_jalur_pendaftaran" value="REGULER">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2"><i class="fa-brands fa-whatsapp text-green-500 mr-1"></i> No. WhatsApp Aktif</label>
-                    <input type="number" name="whatsapp" required value="{{ old('whatsapp') }}" placeholder="08123456..." class="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition font-mono font-bold text-gray-800">
-                </div>
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2"><i class="fa-solid fa-envelope text-red-500 mr-1"></i> Email Aktif</label>
-                    <input type="email" name="email" required value="{{ old('email') }}" placeholder="email@contoh.com" class="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition font-bold text-gray-800">
-                </div>
+                @endforeach
             </div>
 
-            <div>
-                <label class="block text-sm font-bold text-gray-700 mb-2"><i class="fa-solid fa-map-location-dot text-blue-500 mr-1"></i> Alamat Lengkap</label>
-                <textarea name="alamat" required rows="3" placeholder="Nama Jalan, RT/RW, Desa, Kecamatan, Kabupaten/Kota..." class="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition font-bold text-gray-800">{{ old('alamat') }}</textarea>
-            </div>
-
-            <div class="mt-8 bg-yellow-50 border-2 border-yellow-300 p-4 md:p-5 rounded-xl flex items-start gap-4 shadow-sm">
-                <input type="checkbox" id="check_spmb" class="mt-1 w-6 h-6 text-blue-600 rounded border-gray-400 focus:ring-blue-500 cursor-pointer flex-shrink-0">
-                <label for="check_spmb" class="cursor-pointer select-none">
-                    <span class="block text-base font-black text-gray-800 mb-1">Apakah Anda sudah mengajukan akun SPMB?</span>
-                    <span class="block text-xs md:text-sm font-semibold text-gray-600">Dengan mencentang kotak ini, saya menyatakan bahwa data yang saya masukkan adalah benar dan siap mengikuti proses verifikasi berkas sesuai jadwal.</span>
-                </label>
-            </div>
+            @if(!empty($event->confirmation_text))
+                <div class="mt-8 bg-yellow-50 border-2 border-yellow-300 p-4 md:p-5 rounded-xl flex items-start gap-4 shadow-sm">
+                    <input type="checkbox" id="check_confirmation" class="mt-1 w-6 h-6 text-blue-600 rounded border-gray-400 focus:ring-blue-500 cursor-pointer flex-shrink-0">
+                    <label for="check_confirmation" class="cursor-pointer select-none">
+                        <span class="block text-sm md:text-base font-bold text-gray-800">{{ $event->confirmation_text }}</span>
+                    </label>
+                </div>
+            @endif
 
             <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black text-xl py-5 rounded-xl transition shadow-lg mt-4 flex justify-center items-center gap-3">
                 <i class="fa-solid fa-ticket text-2xl"></i> AMBIL TIKET SEKARANG
@@ -250,25 +284,32 @@
     const ticketForm = document.getElementById('ticketForm');
     if (ticketForm) {
         ticketForm.addEventListener('submit', function (e) {
-            let isSpmbChecked = document.getElementById('check_spmb').checked;
-            if (!isSpmbChecked) {
+            const confBox = document.getElementById('check_confirmation');
+            if (confBox && !confBox.checked) {
                 e.preventDefault();
                 Swal.fire({
                     icon: 'warning',
-                    title: 'Tunggu Dulu!',
-                    html: 'Silakan centang kotak konfirmasi berwarna kuning di atas tombol ambil tiket terlebih dahulu.',
-                    confirmButtonColor: '#2563eb',
-                    confirmButtonText: '<i class="fa-solid fa-check"></i> Baik, Saya Paham'
+                    title: 'Konfirmasi Diperlukan',
+                    text: 'Silakan centang kotak pernyataan konfirmasi terlebih dahulu.',
+                    confirmButtonColor: '#2563eb'
                 });
                 return;
             }
 
-            let isKip = document.getElementById('check_kip').checked;
-            let isDtks = document.getElementById('check_dtks').checked;
-            let result = [];
-            if (isKip) result.push('KIP');
-            if (isDtks) result.push('DTKS');
-            document.getElementById('hidden_jalur_pendaftaran').value = result.length > 0 ? result.join(' & ') : 'REGULER';
+            const requiredGroups = document.querySelectorAll('[data-required-checkbox-group]');
+            for (const group of requiredGroups) {
+                const checked = group.querySelectorAll('input[type="checkbox"]:checked').length;
+                if (checked === 0) {
+                    e.preventDefault();
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Data Belum Lengkap',
+                        text: 'Pilih minimal satu opsi pada "' + group.getAttribute('data-required-checkbox-group') + '".',
+                        confirmButtonColor: '#2563eb'
+                    });
+                    return;
+                }
+            }
         });
     }
 </script>
@@ -283,11 +324,11 @@
             <i class="fa-solid fa-print text-4xl text-blue-600"></i>
         </div>
         <h3 class="text-2xl font-black text-gray-800 mb-2">Cetak Ulang</h3>
-        <p class="text-sm text-gray-500 mb-8 font-semibold">Masukkan NISN Anda untuk menarik kembali tiket yang telah didaftarkan.</p>
+        <p class="text-sm text-gray-500 mb-8 font-semibold">Masukkan {{ $event?->identifier_label ?? 'Identitas' }} Anda untuk menarik kembali tiket yang telah didaftarkan.</p>
 
         <form id="reprintForm" class="space-y-4">
             <div>
-                <input type="number" id="reprintNisn" placeholder="Ketik 10 Digit NISN..." required class="w-full p-4 bg-gray-50 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition font-mono text-center text-xl font-black text-gray-800 tracking-widest">
+                <input type="text" id="reprintNisn" placeholder="Ketik {{ $event?->identifier_label ?? 'Identitas' }}..." required class="w-full p-4 bg-gray-50 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition font-mono text-center text-xl font-black text-gray-800 tracking-widest">
             </div>
             <button type="submit" class="w-full bg-blue-600 text-white font-black text-lg py-4 rounded-xl hover:bg-blue-700 transition shadow-md">
                 <i class="fa-solid fa-search mr-2"></i> Cari Tiket Saya
@@ -314,7 +355,7 @@
             fetch("{{ route('ticket.reprint') }}", {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                body: JSON.stringify({ nisn: nisn })
+                body: JSON.stringify({ nisn: nisn, event_id: {{ $event?->id ?? 'null' }} })
             })
             .then(res => res.json())
             .then(data => {
